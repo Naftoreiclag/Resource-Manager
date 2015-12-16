@@ -23,6 +23,16 @@ public:
             UNKNOWN = 0
         };
         
+        static std::string typeToString(const Type& tpe) {
+            switch(tpe) {
+                case IMAGE: return "IMAGE";
+                case MATERIAL: return "MATERIAL";
+                case MESH: return "MESH";
+                case MODEL: return "MODEL";
+                default: return "UNKNOWN";
+            }
+        }
+        
         static Type stringToType(const std::string& str) {
             if(str == "image") {
                 return IMAGE;
@@ -51,18 +61,6 @@ public:
     
     std::vector<Object> objects;
     
-    inline void readProjectData() {
-        Json::Value projectData;
-        std::ifstream fileStream(mFile.c_str());
-        fileStream >> projectData;
-        fileStream.close();
-        
-        mName = projectData["name"].asString();
-        
-        std::cout << "Project Name: " << mName << std::endl;
-        std::cout << std::endl;
-    }
-    
     void parseObject(const Json::Value& objectData, const boost::filesystem::path& objectFile) {
         Object object;
         object.mName = objectData["name"].asString();
@@ -70,13 +68,73 @@ public:
         boost::filesystem::path newPath = objectFile;
         object.mFile = newPath.remove_filename() / objectData["file"].asString();
         
-        std::cout << "Object parsed: (name = " << object.mName << "; type = " << object.mType << "; file = " << object.mFile << ";)" << std::endl;
+        objects.push_back(object);
+        
+        std::cout << "Object: name = " << object.mName << std::endl;
+        std::cout << "\ttype = " << Object::typeToString(object.mType) << std::endl;
+        std::cout << "\tfile = " << object.mFile << std::endl;
     }
     
-    inline void parseObjects() {
+    void recursiveSearch(const boost::filesystem::path& romeo, const std::string& extension, std::vector<boost::filesystem::path>& results) {
+        if(!boost::filesystem::exists(romeo)) {
+            return;
+        }
+        
+        boost::filesystem::directory_iterator endIter;
+        for(boost::filesystem::directory_iterator iter(romeo); iter != endIter; ++ iter) {
+            boost::filesystem::path juliet = *iter;
+            if(boost::filesystem::is_directory(juliet)) {
+                recursiveSearch(juliet, extension, results);
+            }
+            else {
+                if(juliet.has_filename() && juliet.extension() == extension) {
+                    results.push_back(juliet);
+                    std::cout << "\t" << juliet.c_str() << std::endl;
+                }
+            }
+        }
+    }
+    
+    bool process(std::string filename) {
+        std::cout << "Processing: " << filename << std::endl;
+        mFile = filename;
+        if(!boost::filesystem::exists(mFile)) {
+            std::cout << "Project file does not exist!" << std::endl;
+            return false;
+        }
+        mDir = mFile.parent_path();
+        
+        {
+            Json::Value projectData;
+            std::ifstream fileStream(mFile.c_str());
+            fileStream >> projectData;
+            fileStream.close();
+            
+            mName = projectData["name"].asString();
+        }
+        
+        std::cout << "Project Name:" << std::endl;
+        std::cout << "\t" << mName << std::endl;
+        std::cout << std::endl;
+        
+        bool obfuscate = false;
+        boost::filesystem::path configFile = mDir / "compile.config";
+        if(boost::filesystem::exists(configFile)) {
+            Json::Value configData;
+            std::ifstream fileStream(configFile.c_str());
+            fileStream >> configData;
+            fileStream.close();
+            
+            obfuscate = configData["obfuscate"].asBool();
+        }
+        std::cout << "Configuration:" << std::endl;
+        std::cout << "\tobfuscate = " << (obfuscate ? "true" : "false") << std::endl;
+        std::cout << std::endl;
+        
         std::cout << "Searching for objects..." << std::endl;
         std::vector<boost::filesystem::path> objectFiles;
         recursiveSearch(mDir, ".object", objectFiles);
+        recursiveSearch(mDir, ".objects", objectFiles);
         std::cout << std::endl;
         
         std::cout << "Found " << objectFiles.size() << " objects" << std::endl;
@@ -108,41 +166,7 @@ public:
                 std::cout << "Warning! Object defined at " << objectFile << " is not valid!" << std::endl;
             }
         }
-    }
-    
-    void recursiveSearch(const boost::filesystem::path& romeo, const std::string& extension, std::vector<boost::filesystem::path>& results) {
-        if(!boost::filesystem::exists(romeo)) {
-            return;
-        }
-        
-        boost::filesystem::directory_iterator endIter;
-        for(boost::filesystem::directory_iterator iter(romeo); iter != endIter; ++ iter) {
-            boost::filesystem::path juliet = *iter;
-            if(boost::filesystem::is_directory(juliet)) {
-                recursiveSearch(juliet, extension, results);
-            }
-            else {
-                if(juliet.has_filename() && juliet.extension() == extension) {
-                    results.push_back(juliet);
-                    std::cout << "\t" << juliet.c_str() << std::endl;
-                }
-            }
-        }
-    }
-    
-    
-    
-    bool process(std::string filename) {
-        std::cout << "Processing: " << filename << std::endl;
-        mFile = filename;
-        if(!boost::filesystem::exists(mFile)) {
-            std::cout << "Project file does not exist!" << std::endl;
-            return false;
-        }
-        mDir = mFile.parent_path();
-        
-        readProjectData();
-        parseObjects();
+        std::cout << std::endl;
         
         return true;
     }
@@ -162,8 +186,5 @@ int main(int argc, char* argv[]) {
     
     Project project;
     project.process(argv[1]);
-    
-    
-    std::cout << "Hello World!" << std::endl;
     return 0;
 }
