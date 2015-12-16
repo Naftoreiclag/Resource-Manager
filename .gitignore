@@ -7,3 +7,5 @@ source/main/main.txt
 source/main/Debug/*
 source/Makefile
 
+jsoncpp/*
+
