@@ -1,0 +1,9 @@
+source/.codelite/*
+source/.clang/*
+source/resman.tags
+
+source/main/*.mk
+source/main/main.txt
+source/main/Debug/*
+source/Makefile
+
