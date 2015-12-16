@@ -1,0 +1,8 @@
+{
+    "parts" : [
+        {
+            "mesh" : "duncan-mesh",
+            "material" : "duncan-material"
+        }
+    ]
+}
