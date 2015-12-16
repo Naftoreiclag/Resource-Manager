@@ -78,16 +78,33 @@ public:
         std::cout << "\tfile = " << object.mFile << std::endl;
     }
     
-    void recursiveSearch(const boost::filesystem::path& romeo, const std::string& extension, std::vector<boost::filesystem::path>& results) {
+    void recursiveSearch(const boost::filesystem::path& romeo, 
+        const std::string& extension, 
+        std::vector<boost::filesystem::path>& results, 
+        std::vector<boost::filesystem::path>* ignore = 0) {
+            
         if(!boost::filesystem::exists(romeo)) {
             return;
         }
+        
+        
         
         boost::filesystem::directory_iterator endIter;
         for(boost::filesystem::directory_iterator iter(romeo); iter != endIter; ++ iter) {
             boost::filesystem::path juliet = *iter;
             if(boost::filesystem::is_directory(juliet)) {
-                recursiveSearch(juliet, extension, results);
+                bool search = true;
+                if(ignore) {
+                    for(std::vector<boost::filesystem::path>::iterator iter = ignore->begin(); iter != ignore->end(); ++ iter) {
+                        if(boost::filesystem::equivalent(juliet, *iter)) {
+                            search = false;
+                            break;
+                        }
+                    }
+                }
+                if(search) {
+                    recursiveSearch(juliet, extension, results, ignore);
+                }
             }
             else {
                 if(juliet.has_filename() && juliet.extension() == extension) {
@@ -149,6 +166,7 @@ public:
         
         boost::filesystem::path configFile = mDir / "compile.config";
         bool obfuscate = false;
+        std::vector<boost::filesystem::path> ignoreDirs;
         boost::filesystem::path outputDir = mDir / "__output__";
         if(boost::filesystem::exists(configFile)) {
             Json::Value configData;
@@ -158,6 +176,14 @@ public:
             
             outputDir = mDir / (configData["output"].asString());
             obfuscate = configData["obfuscate"].asBool();
+            
+            Json::Value& ignoreData = configData["ignore"];
+            
+            for(Json::Value::iterator iter = ignoreData.begin(); iter != ignoreData.end(); ++ iter) {
+                Json::Value& ignore = *iter;
+                
+                ignoreDirs.push_back(mDir / (ignore.asString()));
+            }
         }
         std::cout << "Configuration:" << std::endl;
         std::cout << "\toutput = " << outputDir << std::endl;
@@ -198,8 +224,8 @@ public:
         
         std::cout << "Searching for objects..." << std::endl;
         std::vector<boost::filesystem::path> objectFiles;
-        recursiveSearch(mDir, ".object", objectFiles);
-        recursiveSearch(mDir, ".objects", objectFiles);
+        recursiveSearch(mDir, ".object", objectFiles, &ignoreDirs);
+        recursiveSearch(mDir, ".objects", objectFiles, &ignoreDirs);
         std::cout << std::endl;
         
         std::cout << "Found " << objectFiles.size() << " objects" << std::endl;
