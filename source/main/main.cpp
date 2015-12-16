@@ -8,20 +8,21 @@
 
 #include "json/json.h"
 
+enum Type {
+    IMAGE = 1,
+    MATERIAL = 2,
+    MESH = 3,
+    MODEL = 4,
+    
+    OTHER = 0
+};
+        
 class Project {
 public:
     Project() { }
     ~Project() { }
     
     struct Object {
-        enum Type {
-            IMAGE = 1,
-            MATERIAL = 2,
-            MESH = 3,
-            MODEL = 4,
-            
-            OTHER = 0
-        };
         
         static std::string typeToString(const Type& tpe) {
             switch(tpe) {
@@ -96,6 +97,10 @@ public:
     }
     
     std::string translateData(const Object& object, const boost::filesystem::path& outputFile) {
+
+        
+        boost::filesystem::copy_file(object.mFile, outputFile);
+        
         return outputFile.filename().c_str();
     }
     
