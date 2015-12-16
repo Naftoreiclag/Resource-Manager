@@ -14,6 +14,33 @@ public:
     ~Project() { }
     
     struct Object {
+        enum Type {
+            IMAGE = 1,
+            MATERIAL = 2,
+            MESH = 3,
+            MODEL = 4,
+            
+            UNKNOWN = 0
+        };
+        
+        static Type stringToType(const std::string& str) {
+            if(str == "image") {
+                return IMAGE;
+            } else 
+            if(str == "material") {
+                return MATERIAL;
+            } else 
+            if(str == "mesh") {
+                return MESH;
+            } else 
+            if(str == "model") {
+                return MODEL;
+            }
+            return UNKNOWN;
+        }
+        
+        std::string mName;
+        Type mType;
         boost::filesystem::path mFile;
     };
 
@@ -26,14 +53,24 @@ public:
     
     inline void readProjectData() {
         Json::Value projectData;
-        std::ifstream infile(mFile.c_str());
-        infile >> projectData;
-        infile.close();
+        std::ifstream fileStream(mFile.c_str());
+        fileStream >> projectData;
+        fileStream.close();
         
         mName = projectData["name"].asString();
         
         std::cout << "Project Name: " << mName << std::endl;
         std::cout << std::endl;
+    }
+    
+    void parseObject(const Json::Value& objectData, const boost::filesystem::path& objectFile) {
+        Object object;
+        object.mName = objectData["name"].asString();
+        object.mType = Object::stringToType(objectData["type"].asString());
+        boost::filesystem::path newPath = objectFile;
+        object.mFile = newPath.remove_filename() / objectData["file"].asString();
+        
+        std::cout << "Object parsed: (name = " << object.mName << "; type = " << object.mType << "; file = " << object.mFile << ";)" << std::endl;
     }
     
     inline void parseObjects() {
@@ -45,8 +82,31 @@ public:
         std::cout << "Found " << objectFiles.size() << " objects" << std::endl;
         std::cout << std::endl;
         
-        for(std::vector<boost::filesystem::path>::iterator iter = objectFiles.begin(); iter != objectFiles.end(); ++ iter) {
+        for(std::vector<boost::filesystem::path>::iterator objectFileIter = objectFiles.begin(); objectFileIter != objectFiles.end(); ++ objectFileIter) {
+            boost::filesystem::path& objectFile = *objectFileIter;
+            Json::Value objectData;
+            std::ifstream fileStream(objectFile.c_str());
+            fileStream >> objectData;
+            fileStream.close();
             
+            if(objectData.isArray()) {
+                for(Json::ValueIterator valueIter = objectData.begin(); valueIter != objectData.end(); ++ valueIter) {
+                    Json::Value& subData = *valueIter;
+                    
+                    if(subData.isObject()) {
+                        parseObject(subData, objectFile);
+                    }
+                    else {
+                        std::cout << "Warning! Object defined in " << objectFile << " is not valid! (value = " << subData.toStyledString() << ")" << std::endl;
+                    }
+                }
+            }
+            else if(objectData.isObject()) {
+                parseObject(objectData, objectFile);
+            }
+            else {
+                std::cout << "Warning! Object defined at " << objectFile << " is not valid!" << std::endl;
+            }
         }
     }
     
