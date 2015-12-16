@@ -20,16 +20,16 @@ public:
             MESH = 3,
             MODEL = 4,
             
-            UNKNOWN = 0
+            OTHER = 0
         };
         
         static std::string typeToString(const Type& tpe) {
             switch(tpe) {
-                case IMAGE: return "IMAGE";
-                case MATERIAL: return "MATERIAL";
-                case MESH: return "MESH";
-                case MODEL: return "MODEL";
-                default: return "UNKNOWN";
+                case IMAGE: return "image";
+                case MATERIAL: return "material";
+                case MESH: return "mesh";
+                case MODEL: return "model";
+                default: return "other";
             }
         }
         
@@ -46,7 +46,7 @@ public:
             if(str == "model") {
                 return MODEL;
             }
-            return UNKNOWN;
+            return OTHER;
         }
         
         std::string mName;
@@ -95,6 +95,10 @@ public:
         }
     }
     
+    std::string translateData(const Object& object, const boost::filesystem::path& outputFile) {
+        return outputFile.filename().c_str();
+    }
+    
     bool process(std::string filename) {
         std::cout << "Processing: " << filename << std::endl;
         mFile = filename;
@@ -117,19 +121,54 @@ public:
         std::cout << "\t" << mName << std::endl;
         std::cout << std::endl;
         
-        bool obfuscate = false;
         boost::filesystem::path configFile = mDir / "compile.config";
+        bool obfuscate = false;
+        boost::filesystem::path outputDir = mDir / "__output__";
         if(boost::filesystem::exists(configFile)) {
             Json::Value configData;
             std::ifstream fileStream(configFile.c_str());
             fileStream >> configData;
             fileStream.close();
             
+            outputDir = mDir / (configData["output"].asString());
             obfuscate = configData["obfuscate"].asBool();
         }
         std::cout << "Configuration:" << std::endl;
+        std::cout << "\toutput = " << outputDir << std::endl;
         std::cout << "\tobfuscate = " << (obfuscate ? "true" : "false") << std::endl;
         std::cout << std::endl;
+        
+        if(boost::filesystem::exists(outputDir)) {
+            std::cout << "Warning! Output directory " << outputDir << " already exists!" << std::endl;
+            bool decided = false;
+            bool decision;
+            while(!decided) {
+                std::cout << "Overwrite? (y/n) ";
+                std::string input;
+                std::cin >> input;
+                
+                char a = *input.begin();
+                if(a == 'y') {
+                    decided = true;
+                    decision = true;
+                }
+                else if(a == 'n') {
+                    decided = true;
+                    decision = false;
+                }
+            }
+            
+            // Overwrite
+            if(decision) {
+                boost::filesystem::remove_all(outputDir);
+            }
+            
+            // Cancel
+            else {
+                return false;
+            }
+        }
+        boost::filesystem::create_directories(outputDir);
         
         std::cout << "Searching for objects..." << std::endl;
         std::vector<boost::filesystem::path> objectFiles;
@@ -168,16 +207,63 @@ public:
         }
         std::cout << std::endl;
         
+        std::cout << "Translating data..." << std::endl;
+        std::cout << std::endl;
+        
+        Json::Value outputPackageData;
+        Json::Value& objectListData = outputPackageData["objects"];
+        unsigned int seqName = 0;
+        for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
+            Object object = *iter;
+            
+            boost::filesystem::path outputObjectFile = outputDir;
+            
+            if(obfuscate) {
+                std::stringstream ss;
+                ss << (seqName ++);
+                ss << ".r";
+                outputObjectFile /= ss.str();
+            }
+            else {
+                outputObjectFile /= object.mFile.filename();
+            }
+            
+            std::string finalOutputName = translateData(object, outputObjectFile);
+            
+            Json::Value& objectDef = objectListData[object.mName];
+            objectDef["name"] = object.mName;
+            objectDef["type"] = Object::typeToString(object.mType);
+            objectDef["file"] = finalOutputName;
+            
+            std::cout << object.mName << std::endl;
+        }
+        std::cout << std::endl;
+        
+        std::cout << "Exporting data.package... ";
+        {
+            std::ofstream finalOutputFile((outputDir / "data.package").c_str());
+            finalOutputFile << outputPackageData;
+            finalOutputFile.close();
+        }
+        std::cout << "Done!" << std::endl;
+        std::cout << std::endl;
+        
         return true;
     }
 };
 
 int main(int argc, char* argv[]) {
     if(argc <= 1) {
-        std::cout << 
-        "Compiles a resource project into a load-ready resource package.\n"
+        std::cout << "\n"
+        "\nCompiles a resource project into a load-ready resource package."
         "\n"
-        "Usage: MACBETH [options] source [destination]\n"
+        "\nUsage: MACBETH [options] source"
+        "\n"
+        "\nOptions:"
+        "\n\t-o\tForce overwrite previous exports"
+        "\n"
+        "\n"
+        "\n"
         "\n"
         ;
         
