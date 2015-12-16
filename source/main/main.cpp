@@ -8,7 +8,7 @@
 
 #include "json/json.h"
 
-enum Type {
+enum ObjectType {
     IMAGE = 1,
     MATERIAL = 2,
     MESH = 3,
@@ -24,7 +24,7 @@ public:
     
     struct Object {
         
-        static std::string typeToString(const Type& tpe) {
+        static std::string typeToString(const ObjectType& tpe) {
             switch(tpe) {
                 case IMAGE: return "image";
                 case MATERIAL: return "material";
@@ -34,7 +34,7 @@ public:
             }
         }
         
-        static Type stringToType(const std::string& str) {
+        static ObjectType stringToType(const std::string& str) {
             if(str == "image") {
                 return IMAGE;
             } else 
@@ -51,8 +51,9 @@ public:
         }
         
         std::string mName;
-        Type mType;
+        ObjectType mType;
         boost::filesystem::path mFile;
+        boost::filesystem::path mDebugOrigin;
     };
 
     boost::filesystem::path mFile;
@@ -64,6 +65,7 @@ public:
     
     void parseObject(const Json::Value& objectData, const boost::filesystem::path& objectFile) {
         Object object;
+        object.mDebugOrigin = objectFile;
         object.mName = objectData["name"].asString();
         object.mType = Object::stringToType(objectData["type"].asString());
         boost::filesystem::path newPath = objectFile;
@@ -97,9 +99,28 @@ public:
     }
     
     std::string translateData(const Object& object, const boost::filesystem::path& outputFile) {
-
-        
-        boost::filesystem::copy_file(object.mFile, outputFile);
+        switch(object.mType) {
+            case IMAGE: {
+                boost::filesystem::copy_file(object.mFile, outputFile);
+                break;
+            }
+            case MATERIAL: {
+                boost::filesystem::copy_file(object.mFile, outputFile);
+                break;
+            }
+            case MESH: {
+                boost::filesystem::copy_file(object.mFile, outputFile);
+                break;
+            }
+            case MODEL: {
+                boost::filesystem::copy_file(object.mFile, outputFile);
+                break;
+            }
+            default: {
+                boost::filesystem::copy_file(object.mFile, outputFile);
+                break;
+            }
+        }
         
         return outputFile.filename().c_str();
     }
@@ -212,6 +233,61 @@ public:
         }
         std::cout << std::endl;
         
+        {
+            typedef std::vector<boost::filesystem::path> PathList;
+            typedef std::pair<std::string, PathList> NameObjectListPair;
+            typedef std::vector<NameObjectListPair> ObjectMap;
+            ObjectMap objectMap;
+            
+            bool foundErrors = false;
+            for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
+                Object& exam = *iter;
+                
+                PathList* pathList = 0;
+                for(ObjectMap::iterator look = objectMap.begin(); look != objectMap.end(); ++ look) {
+                    NameObjectListPair& pair = *look;
+                    
+                    // Oh no!
+                    if(pair.first == exam.mName) {
+                        pathList = &pair.second;
+                        break;
+                    }
+                }
+                
+                if(pathList) {
+                    foundErrors = true;
+                    pathList->push_back(exam.mDebugOrigin);
+                } else {
+                    NameObjectListPair nolp;
+                    nolp.first = exam.mName;
+                    nolp.second.push_back(exam.mDebugOrigin);
+                    objectMap.push_back(nolp);
+                }
+            }
+            
+            if(foundErrors) {
+                for(ObjectMap::iterator look = objectMap.begin(); look != objectMap.end(); ++ look) {
+                    NameObjectListPair& pair = *look;
+                    
+                    if(pair.second.size() > 1) {
+                        std::cout << "Fatal! Detected naming conflict for object \"" << pair.first << "\"" << std::endl;
+                        std::cout << "\tOffending files:" << std::endl;
+                        for(PathList::iterator egg = pair.second.begin(); egg != pair.second.end(); ++ egg) {
+                            std::cout << "\t" << (*egg) << std::endl;
+                        }
+                    }
+                }
+                std::cout << "Could not compile!" << std::endl;
+                std::cout << std::endl;
+                return false;
+            }
+            else {
+                std::cout << "No naming conflicts detected!" << std::endl;
+            }
+            
+        }
+        std::cout << std::endl;
+        
         std::cout << "Translating data..." << std::endl;
         std::cout << std::endl;
         
@@ -219,7 +295,7 @@ public:
         Json::Value& objectListData = outputPackageData["objects"];
         unsigned int seqName = 0;
         for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
-            Object object = *iter;
+            Object& object = *iter;
             
             boost::filesystem::path outputObjectFile = outputDir;
             
