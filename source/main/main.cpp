@@ -3,6 +3,8 @@
 #include <sstream>
 #include <string>
 
+#include <boost/filesystem.hpp>
+
 #include "json/json.h"
 
 void process(std::string filename) {
@@ -12,6 +14,10 @@ void process(std::string filename) {
     infile >> root;
     infile.close();
     
+    boost::filesystem::path proj(filename);
+    boost::filesystem::path egg = proj.parent_path();
+    
+    std::cout << egg << std::endl;
     
     std::string projectName = root["name"].asString();
     std::cout << "Project Name: " << projectName << std::endl;
