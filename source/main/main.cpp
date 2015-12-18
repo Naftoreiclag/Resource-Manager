@@ -13,25 +13,18 @@ enum ObjectType {
     MATERIAL,
     MESH,
     MODEL,
+    VERTEX_SHADER,
+    FRAGMENT_SHADER,
+    GEOMETRY_SHADER,
     
     OTHER
 };
 
 std::string translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile) {
     switch(otype) {
-        case IMAGE: {
-            boost::filesystem::copy_file(fromFile, outputFile);
-            break;
-        }
-        case MATERIAL: {
-            boost::filesystem::copy_file(fromFile, outputFile);
-            break;
-        }
         case MESH: {
-            boost::filesystem::copy_file(fromFile, outputFile);
-            break;
-        }
-        case MODEL: {
+            // TODO: something else
+            
             boost::filesystem::copy_file(fromFile, outputFile);
             break;
         }
@@ -50,6 +43,9 @@ std::string typeToString(const ObjectType& tpe) {
         case MATERIAL: return "material";
         case MESH: return "mesh";
         case MODEL: return "model";
+        case VERTEX_SHADER: return "vertex-shader";
+        case FRAGMENT_SHADER: return "fragment-shader";
+        case GEOMETRY_SHADER: return "geometry-shader";
         default: return "other";
     }
 }
@@ -66,6 +62,15 @@ ObjectType stringToType(const std::string& str) {
     } else 
     if(str == "model") {
         return MODEL;
+    } else 
+    if(str == "vertex-shader") {
+        return VERTEX_SHADER;
+    } else 
+    if(str == "fragment-shader") {
+        return FRAGMENT_SHADER;
+    } else 
+    if(str == "geometry-shader") {
+        return GEOMETRY_SHADER;
     }
     return OTHER;
 }
@@ -170,6 +175,7 @@ public:
         bool obfuscate = false;
         std::vector<boost::filesystem::path> ignoreDirs;
         boost::filesystem::path outputDir = mDir / "__output__";
+        bool forceOverwriteOutput = false;
         if(boost::filesystem::exists(configFile)) {
             Json::Value configData;
             std::ifstream fileStream(configFile.c_str());
@@ -178,6 +184,7 @@ public:
             
             outputDir = mDir / (configData["output"].asString());
             obfuscate = configData["obfuscate"].asBool();
+            forceOverwriteOutput = configData["force-overwrite-output"].asBool();
             
             Json::Value& ignoreData = configData["ignore"];
             
@@ -193,33 +200,38 @@ public:
         std::cout << std::endl;
         
         if(boost::filesystem::exists(outputDir)) {
-            std::cout << "Warning! Output directory " << outputDir << " already exists!" << std::endl;
-            bool decided = false;
-            bool decision;
-            while(!decided) {
-                std::cout << "Overwrite? (y/n) ";
-                std::string input;
-                std::cin >> input;
-                
-                char a = *input.begin();
-                if(a == 'y') {
-                    decided = true;
-                    decision = true;
-                }
-                else if(a == 'n') {
-                    decided = true;
-                    decision = false;
-                }
-            }
-            
-            // Overwrite
-            if(decision) {
+            if(forceOverwriteOutput) {
                 boost::filesystem::remove_all(outputDir);
             }
-            
-            // Cancel
             else {
-                return false;
+                std::cout << "Warning! Output directory " << outputDir << " already exists!" << std::endl;
+                bool decided = false;
+                bool decision;
+                while(!decided) {
+                    std::cout << "Overwrite? (y/n) ";
+                    std::string input;
+                    std::cin >> input;
+                    
+                    char a = *input.begin();
+                    if(a == 'y') {
+                        decided = true;
+                        decision = true;
+                    }
+                    else if(a == 'n') {
+                        decided = true;
+                        decision = false;
+                    }
+                }
+                
+                // Overwrite
+                if(decision) {
+                    boost::filesystem::remove_all(outputDir);
+                }
+                
+                // Cancel
+                else {
+                    return false;
+                }
             }
         }
         boost::filesystem::create_directories(outputDir);
