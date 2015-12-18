@@ -73,7 +73,7 @@ public:
         
         objects.push_back(object);
         
-        std::cout << "Object: name = " << object.mName << std::endl;
+        std::cout << "Resource: name = " << object.mName << std::endl;
         std::cout << "\ttype = " << Object::typeToString(object.mType) << std::endl;
         std::cout << "\tfile = " << object.mFile << std::endl;
     }
@@ -86,8 +86,6 @@ public:
         if(!boost::filesystem::exists(romeo)) {
             return;
         }
-        
-        
         
         boost::filesystem::directory_iterator endIter;
         for(boost::filesystem::directory_iterator iter(romeo); iter != endIter; ++ iter) {
@@ -222,13 +220,13 @@ public:
         }
         boost::filesystem::create_directories(outputDir);
         
-        std::cout << "Searching for objects..." << std::endl;
+        std::cout << "Searching for resources..." << std::endl;
         std::vector<boost::filesystem::path> objectFiles;
-        recursiveSearch(mDir, ".object", objectFiles, &ignoreDirs);
-        recursiveSearch(mDir, ".objects", objectFiles, &ignoreDirs);
+        recursiveSearch(mDir, ".resource", objectFiles, &ignoreDirs);
+        recursiveSearch(mDir, ".resources", objectFiles, &ignoreDirs);
         std::cout << std::endl;
         
-        std::cout << "Found " << objectFiles.size() << " objects" << std::endl;
+        std::cout << "Found " << objectFiles.size() << " resources" << std::endl;
         std::cout << std::endl;
         
         for(std::vector<boost::filesystem::path>::iterator objectFileIter = objectFiles.begin(); objectFileIter != objectFiles.end(); ++ objectFileIter) {
@@ -246,7 +244,7 @@ public:
                         parseObject(subData, objectFile);
                     }
                     else {
-                        std::cout << "Warning! Object defined in " << objectFile << " is not valid! (value = " << subData.toStyledString() << ")" << std::endl;
+                        std::cout << "Warning! Resource defined in " << objectFile << " is not valid! (value = " << subData.toStyledString() << ")" << std::endl;
                     }
                 }
             }
@@ -254,7 +252,7 @@ public:
                 parseObject(objectData, objectFile);
             }
             else {
-                std::cout << "Warning! Object defined at " << objectFile << " is not valid!" << std::endl;
+                std::cout << "Warning! Resource defined at " << objectFile << " is not valid!" << std::endl;
             }
         }
         std::cout << std::endl;
@@ -296,7 +294,7 @@ public:
                     NameObjectListPair& pair = *look;
                     
                     if(pair.second.size() > 1) {
-                        std::cout << "Fatal! Detected naming conflict for object \"" << pair.first << "\"" << std::endl;
+                        std::cout << "Fatal! Detected naming conflict for resource \"" << pair.first << "\"" << std::endl;
                         std::cout << "\tOffending files:" << std::endl;
                         for(PathList::iterator egg = pair.second.begin(); egg != pair.second.end(); ++ egg) {
                             std::cout << "\t" << (*egg) << std::endl;
@@ -376,6 +374,8 @@ int main(int argc, char* argv[]) {
         
         return 0;
     }
+    
+    
     
     Project project;
     project.process(argv[1]);

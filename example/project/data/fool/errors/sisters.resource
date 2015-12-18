@@ -1,5 +1,5 @@
 {
-    "name" : "duncan-model",
+    "name" : "graymalkin-model",
     "type" : "model",
     "file" : "model/duncan.model"
 }

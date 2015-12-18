@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CodeLite_Workspace Name="resman" Database="resman.tags">
-  <Project Name="main" Path="main/main.project" Active="No"/>
-  <Project Name="loader" Path="loader/loader.project" Active="Yes"/>
+  <Project Name="main" Path="main/main.project" Active="Yes"/>
+  <Project Name="loader" Path="loader/loader.project" Active="No"/>
   <BuildMatrix>
     <WorkspaceConfiguration Name="Debug" Selected="yes">
       <Project Name="main" ConfigName="Debug"/>
