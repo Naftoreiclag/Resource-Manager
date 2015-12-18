@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <stdint.h>
 #include <string>
 #include <vector>
 
@@ -21,7 +22,7 @@ enum ObjectType {
     OTHER
 };
 
-std::string translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile) {
+std::string translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize) {
     switch(otype) {
         case MESH: {
             // TODO: something else
@@ -30,10 +31,13 @@ std::string translateData(const ObjectType& otype, const boost::filesystem::path
             break;
         }
         default: {
+            
             boost::filesystem::copy_file(fromFile, outputFile);
             break;
         }
     }
+    std::ifstream sizeTest(outputFile.c_str(), std::ios::binary | std::ios::ate);
+    filesize = sizeTest.tellg();
     
     return outputFile.filename().c_str();
 }
@@ -86,9 +90,6 @@ public:
     ~Project() { }
     
     struct Object {
-        
-        
-        
         std::string mName;
         ObjectType mType;
         boost::filesystem::path mFile;
@@ -358,12 +359,14 @@ public:
                 outputObjectFile /= object.mFile.filename();
             }
             
-            std::string finalOutputName = translateData(object.mType, object.mFile, outputObjectFile);
-            
+            uint32_t filesize;
+            std::string finalOutputName = translateData(object.mType, object.mFile, outputObjectFile, filesize);
+            //
             Json::Value& objectDef = objectListData[object.mName];
             objectDef["name"] = object.mName;
             objectDef["type"] = typeToString(object.mType);
             objectDef["file"] = finalOutputName;
+            objectDef["size"] = filesize;
             
             std::cout << object.mName << std::endl;
         }
