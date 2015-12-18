@@ -16,6 +16,7 @@ enum ObjectType {
     VERTEX_SHADER,
     FRAGMENT_SHADER,
     GEOMETRY_SHADER,
+    TEXT,
     
     OTHER
 };
@@ -46,6 +47,7 @@ std::string typeToString(const ObjectType& tpe) {
         case VERTEX_SHADER: return "vertex-shader";
         case FRAGMENT_SHADER: return "fragment-shader";
         case GEOMETRY_SHADER: return "geometry-shader";
+        case TEXT: return "text";
         default: return "other";
     }
 }
@@ -71,6 +73,9 @@ ObjectType stringToType(const std::string& str) {
     } else 
     if(str == "geometry-shader") {
         return GEOMETRY_SHADER;
+    } else 
+    if(str == "text") {
+        return TEXT;
     }
     return OTHER;
 }
@@ -102,6 +107,10 @@ public:
         object.mDebugOrigin = objectFile;
         object.mName = objectData["name"].asString();
         object.mType = stringToType(objectData["type"].asString());
+        if(object.mType == OTHER) {
+            std::cout << "Warning! Unknown resource type " << objectData["type"].asString() << " found in resource " << object.mName << " found at " << object.mDebugOrigin << std::endl;
+        }
+        
         boost::filesystem::path newPath = objectFile;
         object.mFile = newPath.remove_filename() / objectData["file"].asString();
         
