@@ -342,7 +342,8 @@ public:
         std::cout << std::endl;
         
         Json::Value outputPackageData;
-        Json::Value& objectListData = outputPackageData["objects"];
+        Json::Value& objectListData = outputPackageData["resources"];
+        unsigned int jsonListIndex = 0;
         unsigned int seqName = 0;
         for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
             Object& object = *iter;
@@ -362,13 +363,15 @@ public:
             uint32_t filesize;
             std::string finalOutputName = translateData(object.mType, object.mFile, outputObjectFile, filesize);
             //
-            Json::Value& objectDef = objectListData[object.mName];
+            Json::Value& objectDef = objectListData[jsonListIndex];
             objectDef["name"] = object.mName;
             objectDef["type"] = typeToString(object.mType);
             objectDef["file"] = finalOutputName;
             objectDef["size"] = filesize;
             
             std::cout << object.mName << std::endl;
+            
+            ++ jsonListIndex;
         }
         std::cout << std::endl;
         
