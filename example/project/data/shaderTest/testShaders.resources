@@ -1,0 +1,12 @@
+[
+    {
+        "name" : "TestShader.vertex",
+        "type" : "vertex-shader",
+        "file" : "test.vert"
+    },
+    {
+        "name" : "TestShader.fragment",
+        "type" : "fragment-shader",
+        "file" : "test.frag"
+    }
+]
