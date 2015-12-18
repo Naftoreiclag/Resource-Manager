@@ -13,9 +13,15 @@ class ResourceManager {
 private:
     std::map<std::string, TextResource*> mTexts;
     std::map<std::string, MiscResource*> mMiscs;
+    
+    uint32_t mPermaloadThreshold;
+    
 public:
     ResourceManager();
     ~ResourceManager();
+    
+    void setPermaloadThreshold(uint32_t size);
+    const uint32_t& getPermaloadThreshold();
 
     void mapAll(boost::filesystem::path data);
     

@@ -5,13 +5,16 @@
 #include "json/json.h"
 
 ResourceManager::ResourceManager() {
-    
-
 }
 
 ResourceManager::~ResourceManager() {
-    
+}
 
+void ResourceManager::setPermaloadThreshold(uint32_t size) {
+    mPermaloadThreshold = size;
+}
+const uint32_t& ResourceManager::getPermaloadThreshold() {
+    return mPermaloadThreshold;
 }
 
 void ResourceManager::mapAll(boost::filesystem::path dataPackFile) {
@@ -44,6 +47,9 @@ void ResourceManager::mapAll(boost::filesystem::path dataPackFile) {
         newRes->setName(name);
         newRes->setFile(dataPackDir / file);
         newRes->setSize(size);
+        if(size < mPermaloadThreshold) {
+            newRes->grab();
+        }
         
     }
 }

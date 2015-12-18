@@ -16,7 +16,6 @@ bool TextResource::load() {
         return true;
     }
     
-    
     std::ifstream loader(this->getFile().c_str());
     std::stringstream ss;
     ss << loader.rdbuf();
@@ -28,6 +27,8 @@ bool TextResource::load() {
 }
 
 bool TextResource::unload() {
+    // Text files are not worth unloading, probably...
+    
     return true;
 }
 
