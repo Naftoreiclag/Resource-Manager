@@ -1,0 +1,5 @@
+{
+    "name" : "core",
+    "description" : "The core resources needed for the main application",
+    "comment" : "A cleaner and more practical example setup"
+}

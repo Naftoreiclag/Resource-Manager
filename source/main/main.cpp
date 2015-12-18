@@ -252,7 +252,7 @@ public:
         recursiveSearch(mDir, ".resources", objectFiles, &ignoreDirs);
         std::cout << std::endl;
         
-        std::cout << "Found " << objectFiles.size() << " resources" << std::endl;
+        std::cout << "Found " << objectFiles.size() << " resource declaration files." << std::endl;
         std::cout << std::endl;
         
         for(std::vector<boost::filesystem::path>::iterator objectFileIter = objectFiles.begin(); objectFileIter != objectFiles.end(); ++ objectFileIter) {
@@ -270,7 +270,7 @@ public:
                         parseObject(subData, objectFile);
                     }
                     else {
-                        std::cout << "Warning! Resource defined in " << objectFile << " is not valid! (value = " << subData.toStyledString() << ")" << std::endl;
+                        std::cout << "Warning! Resource declared in " << objectFile << " is not valid! (value = " << subData.toStyledString() << ")" << std::endl;
                     }
                 }
             }
@@ -278,7 +278,7 @@ public:
                 parseObject(objectData, objectFile);
             }
             else {
-                std::cout << "Warning! Resource defined at " << objectFile << " is not valid!" << std::endl;
+                std::cout << "Warning! Resource declared at " << objectFile << " is not valid!" << std::endl;
             }
         }
         std::cout << std::endl;
@@ -321,7 +321,7 @@ public:
                     
                     if(pair.second.size() > 1) {
                         std::cout << "Fatal! Detected naming conflict for resource \"" << pair.first << "\"" << std::endl;
-                        std::cout << "\tOffending files:" << std::endl;
+                        std::cout << "\tOffending declaration files:" << std::endl;
                         for(PathList::iterator egg = pair.second.begin(); egg != pair.second.end(); ++ egg) {
                             std::cout << "\t" << (*egg) << std::endl;
                         }

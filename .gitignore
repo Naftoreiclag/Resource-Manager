@@ -12,6 +12,7 @@ source/loader/Debug/*
 source/Makefile
 
 example/output/*
+example2/output/*
 
 jsoncpp/*
 
