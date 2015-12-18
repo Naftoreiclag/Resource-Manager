@@ -9,13 +9,66 @@
 #include "json/json.h"
 
 enum ObjectType {
-    IMAGE = 1,
-    MATERIAL = 2,
-    MESH = 3,
-    MODEL = 4,
+    IMAGE,
+    MATERIAL,
+    MESH,
+    MODEL,
     
-    OTHER = 0
+    OTHER
 };
+
+std::string translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile) {
+    switch(otype) {
+        case IMAGE: {
+            boost::filesystem::copy_file(fromFile, outputFile);
+            break;
+        }
+        case MATERIAL: {
+            boost::filesystem::copy_file(fromFile, outputFile);
+            break;
+        }
+        case MESH: {
+            boost::filesystem::copy_file(fromFile, outputFile);
+            break;
+        }
+        case MODEL: {
+            boost::filesystem::copy_file(fromFile, outputFile);
+            break;
+        }
+        default: {
+            boost::filesystem::copy_file(fromFile, outputFile);
+            break;
+        }
+    }
+    
+    return outputFile.filename().c_str();
+}
+
+std::string typeToString(const ObjectType& tpe) {
+    switch(tpe) {
+        case IMAGE: return "image";
+        case MATERIAL: return "material";
+        case MESH: return "mesh";
+        case MODEL: return "model";
+        default: return "other";
+    }
+}
+
+ObjectType stringToType(const std::string& str) {
+    if(str == "image") {
+        return IMAGE;
+    } else 
+    if(str == "material") {
+        return MATERIAL;
+    } else 
+    if(str == "mesh") {
+        return MESH;
+    } else 
+    if(str == "model") {
+        return MODEL;
+    }
+    return OTHER;
+}
         
 class Project {
 public:
@@ -24,31 +77,7 @@ public:
     
     struct Object {
         
-        static std::string typeToString(const ObjectType& tpe) {
-            switch(tpe) {
-                case IMAGE: return "image";
-                case MATERIAL: return "material";
-                case MESH: return "mesh";
-                case MODEL: return "model";
-                default: return "other";
-            }
-        }
         
-        static ObjectType stringToType(const std::string& str) {
-            if(str == "image") {
-                return IMAGE;
-            } else 
-            if(str == "material") {
-                return MATERIAL;
-            } else 
-            if(str == "mesh") {
-                return MESH;
-            } else 
-            if(str == "model") {
-                return MODEL;
-            }
-            return OTHER;
-        }
         
         std::string mName;
         ObjectType mType;
@@ -67,14 +96,14 @@ public:
         Object object;
         object.mDebugOrigin = objectFile;
         object.mName = objectData["name"].asString();
-        object.mType = Object::stringToType(objectData["type"].asString());
+        object.mType = stringToType(objectData["type"].asString());
         boost::filesystem::path newPath = objectFile;
         object.mFile = newPath.remove_filename() / objectData["file"].asString();
         
         objects.push_back(object);
         
         std::cout << "Resource: name = " << object.mName << std::endl;
-        std::cout << "\ttype = " << Object::typeToString(object.mType) << std::endl;
+        std::cout << "\ttype = " << typeToString(object.mType) << std::endl;
         std::cout << "\tfile = " << object.mFile << std::endl;
     }
     
@@ -113,32 +142,7 @@ public:
         }
     }
     
-    std::string translateData(const Object& object, const boost::filesystem::path& outputFile) {
-        switch(object.mType) {
-            case IMAGE: {
-                boost::filesystem::copy_file(object.mFile, outputFile);
-                break;
-            }
-            case MATERIAL: {
-                boost::filesystem::copy_file(object.mFile, outputFile);
-                break;
-            }
-            case MESH: {
-                boost::filesystem::copy_file(object.mFile, outputFile);
-                break;
-            }
-            case MODEL: {
-                boost::filesystem::copy_file(object.mFile, outputFile);
-                break;
-            }
-            default: {
-                boost::filesystem::copy_file(object.mFile, outputFile);
-                break;
-            }
-        }
-        
-        return outputFile.filename().c_str();
-    }
+    
     
     bool process(std::string filename) {
         std::cout << "Processing: " << filename << std::endl;
@@ -333,11 +337,11 @@ public:
                 outputObjectFile /= object.mFile.filename();
             }
             
-            std::string finalOutputName = translateData(object, outputObjectFile);
+            std::string finalOutputName = translateData(object.mType, object.mFile, outputObjectFile);
             
             Json::Value& objectDef = objectListData[object.mName];
             objectDef["name"] = object.mName;
-            objectDef["type"] = Object::typeToString(object.mType);
+            objectDef["type"] = typeToString(object.mType);
             objectDef["file"] = finalOutputName;
             
             std::cout << object.mName << std::endl;
