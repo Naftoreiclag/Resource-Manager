@@ -5,6 +5,10 @@ source/resman.tags
 source/main/*.mk
 source/main/main.txt
 source/main/Debug/*
+source/loader/*.mk
+source/loader/loader.txt
+source/loader/Debug/*
+
 source/Makefile
 
 example/output/*
