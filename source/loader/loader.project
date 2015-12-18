@@ -6,6 +6,12 @@
     <File Name="main.cpp"/>
     <File Name="ResourceManager.cpp"/>
     <File Name="ResourceManager.hpp"/>
+    <File Name="Resource.cpp"/>
+    <File Name="Resource.hpp"/>
+    <File Name="TextResource.cpp"/>
+    <File Name="TextResource.hpp"/>
+    <File Name="MiscResource.cpp"/>
+    <File Name="MiscResource.hpp"/>
   </VirtualDirectory>
   <VirtualDirectory Name="jsoncpp">
     <File Name="../../jsoncpp/dist/jsoncpp.cpp"/>
