@@ -148,6 +148,61 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
                     image = newImageData;
                     components = 3;
                 }
+                /*
+                else if(alphaCleave == "shell") {
+                    int size = width * height * 3;
+                    unsigned char* newImageData = new unsigned char[size];
+
+                    for(int y = 0; y < height; ++ y) {
+                        for(int x = 0; x < width; ++ x) {
+
+                            unsigned char an = image[(x + (y * width)) * components + 3];
+
+                            if(an > 127) {
+                                newImageData[(x + (y * width)) * 3 + 0] = image[(x + (y * width)) * components + 0];
+                                newImageData[(x + (y * width)) * 3 + 1] = image[(x + (y * width)) * components + 1];
+                                newImageData[(x + (y * width)) * 3 + 2] = image[(x + (y * width)) * components + 2];
+                            }
+                            else {
+                                bool first = true;
+                                double closest;
+                                unsigned char rn, gn, bn;
+                                for(int y2 = 0; y2 < height; ++ y2) {
+                                    for(int x2 = 0; x2 < width; ++ x2) {
+
+                                        unsigned char alphaTest = image[(x2 + (y2 * width)) * components + 3];
+
+                                        if(alphaTest > 127) {
+                                            if(first) {
+                                                first = false;
+                                                closest = ((x - x2) * (x - x2)) + ((y - y2) * (y - y2));
+                                            }
+                                            else {
+                                                double maybe = ((x - x2) * (x - x2)) + ((y - y2) * (y - y2));
+                                                if(maybe < closest) {
+                                                    closest = maybe;
+                                                    newImageData[(x + (y * width)) * 3 + 0] = image[(x2 + (y2 * width)) * components + 0];
+                                                    newImageData[(x + (y * width)) * 3 + 1] = image[(x2 + (y2 * width)) * components + 1];
+                                                    newImageData[(x + (y * width)) * 3 + 2] = image[(x2 + (y2 * width)) * components + 2];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if(deleteFinalImage) {
+                        delete image;
+                    } else {
+                        stbi_image_free(image);
+                    }
+                    deleteFinalImage = true;
+                    image = newImageData;
+                    components = 3;
+                }
+                */
             }
         }
     }
