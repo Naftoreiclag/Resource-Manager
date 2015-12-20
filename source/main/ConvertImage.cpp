@@ -157,48 +157,90 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
 
                     unsigned char opp = 127;
 
+                    double total = width * height;
+                    int percentDone = 0;
+                    double progress = 0;
                     for(int y = 0; y < height; ++ y) {
                         for(int x = 0; x < width; ++ x) {
-
-                            unsigned char an = image[(x + (y * width)) * components + 3];
 
                             unsigned char& finalR = newImageData[(x + (y * width)) * 3 + 0];
                             unsigned char& finalG = newImageData[(x + (y * width)) * 3 + 1];
                             unsigned char& finalB = newImageData[(x + (y * width)) * 3 + 2];
+                            finalR = 255;
+                            finalG = 0;
+                            finalB = 255;
 
-                            if(an > opp) {
+                            if(image[(x + (y * width)) * components + 3] > opp) {
                                 finalR = image[(x + (y * width)) * components + 0];
                                 finalG = image[(x + (y * width)) * components + 1];
                                 finalB = image[(x + (y * width)) * components + 2];
                             }
                             else {
-                                std::cout << x << "\t" << y << std::endl;
                                 bool first = true;
+
                                 bool recalc = false;
+
                                 double closest;
+
+                                /*
+                                // Brute force
+                                for(int y2 = 0; y2 < height; ++ y2) {
+                                    for(int x2 = 0; x2 < width; ++ x2) {
+                                        if(image[(x2 + (y2 * width)) * components + 3] > opp) {
+                                            double dist = ((x - x2) * (x - x2)) + ((y - y2) * (y - y2));
+                                            if(first) {
+                                                first = false;
+                                                closest = dist;
+                                                finalR = image[(x2 + (y2 * width)) * components + 0];
+                                                finalG = image[(x2 + (y2 * width)) * components + 1];
+                                                finalB = image[(x2 + (y2 * width)) * components + 2];
+                                            }
+                                            else {
+                                                if(dist < closest) {
+                                                    closest = dist;
+                                                    finalR = image[(x2 + (y2 * width)) * components + 0];
+                                                    finalG = image[(x2 + (y2 * width)) * components + 1];
+                                                    finalB = image[(x2 + (y2 * width)) * components + 2];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                */
+
+                                // Slightly more efficient
+
                                 int end = height > width ? height : width;
-                                for(int rad = 1; rad < end; ++ rad) {
+                                if((end & 1) == 1) {
+                                    ++ end;
+                                }
+                                end /= 2;
+
+                                for(int expand = 1; expand < end; ++ expand) {
+
+
+                                    // Begin of spiral algorithm
                                     for(int index = 0; index < 4; ++ index) {
-                                        /*
-                                         * 0  >  1
-                                         *
-                                         * ^     v
-                                         *
-                                         * 3  <  2
-                                         */
+                                        // 0  >  1
+                                        //
+                                        // ^     v
+                                        //
+                                        // 3  <  2
 
-                                        int x2 = (index == 0 || index == 3) ? (x - rad) : (x + rad);
-                                        int y2 = (index == 0 || index == 1) ? (y - rad) : (y + rad);
+                                        int x2 = (index == 0 || index == 3) ? (x - expand) : (x + expand);
+                                        int y2 = (index == 0 || index == 1) ? (y - expand) : (y + expand);
 
-                                        for(int lear = 0; lear < rad; ++ lear) {
-                                            if(index == 0) {
-                                                ++ x2;
-                                            } else if(index == 1) {
-                                                ++ y2;
-                                            } else if(index == 2) {
-                                                -- x2;
-                                            } else if(index == 3) {
-                                                -- y2;
+                                        for(int lear = 0; lear <= expand; ++ lear) {
+                                            if(lear > 0) {
+                                                if(index == 0) {
+                                                    ++ x2;
+                                                } else if(index == 1) {
+                                                    ++ y2;
+                                                } else if(index == 2) {
+                                                    -- x2;
+                                                } else if(index == 3) {
+                                                    -- y2;
+                                                }
                                             }
 
                                             if(x2 < 0 || x2 >= width || y2 < 0 || y2 >= height) {
@@ -212,6 +254,9 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
                                                 if(first) {
                                                     first = false;
                                                     closest = dist;
+                                                    finalR = image[(x2 + (y2 * width)) * components + 0];
+                                                    finalG = image[(x2 + (y2 * width)) * components + 1];
+                                                    finalB = image[(x2 + (y2 * width)) * components + 2];
                                                 }
                                                 else {
                                                     if(dist < closest) {
@@ -225,11 +270,21 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
                                         }
                                     }
 
+                                    // If a opaque pixel was found in that search
                                     if(!first && !recalc) {
-                                        end = (2 * rad < end) ? 2 * rad : end;
+                                        double newEnd = ((double) expand) * 1.5;
+                                        end = (newEnd < end) ? (newEnd) : end;
                                         recalc = true;
                                     }
                                 }
+                            }
+
+                            progress += 1;
+
+                            if(progress >= (total / 10.0)) {
+                                percentDone += 10;
+                                progress = 0;
+                                std::cout << "\t" << percentDone << "%" << std::endl;
                             }
                         }
                     }
