@@ -18,7 +18,8 @@
                 "absolute" : true,
                 "width" : 128,
                 "height" : 128
-            }
+            },
+            "debug" : true
         }
     },
     {

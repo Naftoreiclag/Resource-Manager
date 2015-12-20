@@ -1,14 +1,16 @@
 #include "Convert.hpp"
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
-std::string convertImage(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params) {
+std::string convertImage(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
 
     int width;
     int height;
@@ -20,10 +22,15 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
         return "";
     }
 
+    bool writeAsDebug = false;
     bool deleteFinalImage = false;
 
     if(!params.isNull()) {
         const Json::Value& resize = params["resize"];
+
+        if(!params["debug"].isNull()) {
+            writeAsDebug = params["debug"].asBool();
+        }
 
         if(!resize.isNull()) {
             bool absolute = true;
@@ -79,6 +86,23 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
         }
     }
 
+    std::cout << "\tWidth: " << width << std::endl;
+    std::cout << "\tHeight: " << height << std::endl;
+    std::cout << "\tComponents: " << components << std::endl;
+    std::cout << "\tRaw array size: " << (width * height * components) << std::endl;
+
+    if(writeAsDebug) {
+        int result = stbi_write_png(outputFile.c_str(), width, height, components, image, 0);
+
+        if(result > 0) {
+            std::cout << "\tWritten as debug!" << std::endl;
+            return outputFile.filename().c_str();
+        }
+        else {
+            std::cout << "\tFailed to write as debug!" << std::endl;
+        }
+    }
+
     std::ofstream outputData(outputFile.c_str(), std::ios::out | std::ios::binary);
 
     outputData << width;
@@ -92,11 +116,6 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
             }
         }
     }
-
-    std::cout << "\tWidth: " << width << std::endl;
-    std::cout << "\tHeight: " << height << std::endl;
-    std::cout << "\tComponents: " << components << std::endl;
-    std::cout << "\tRaw array size: " << (width * height * components) << std::endl;
 
     outputData.close();
 

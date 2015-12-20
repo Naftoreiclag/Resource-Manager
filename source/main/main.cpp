@@ -24,21 +24,21 @@ enum ObjectType {
     OTHER
 };
 
-std::string translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params) {
+std::string translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
     std::string finalOutputName;
 
     switch(otype) {
         case MESH: {
             // TODO: something else
-            finalOutputName = convertMiscellaneous(fromFile, outputFile, params);
+            finalOutputName = convertMiscellaneous(fromFile, outputFile, params, modifyFilename);
             break;
         }
         case IMAGE: {
-            finalOutputName = convertImage(fromFile, outputFile, params);
+            finalOutputName = convertImage(fromFile, outputFile, params, modifyFilename);
             break;
         }
         default: {
-            finalOutputName = convertMiscellaneous(fromFile, outputFile, params);
+            finalOutputName = convertMiscellaneous(fromFile, outputFile, params, modifyFilename);
             break;
         }
     }
@@ -371,7 +371,7 @@ public:
             std::cout << object.mName << std::endl;
 
             uint32_t filesize;
-            std::string finalOutputName = translateData(object.mType, object.mFile, outputObjectFile, filesize, object.mParams);
+            std::string finalOutputName = translateData(object.mType, object.mFile, outputObjectFile, filesize, object.mParams, !obfuscate);
             //
             Json::Value& objectDef = objectListData[jsonListIndex];
             objectDef["name"] = object.mName;
