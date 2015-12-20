@@ -27,7 +27,7 @@
         "type" : "image",
         "file" : "WeirdAlpha.png",
         "params" : {
-            "alphaCleave" : "lazy",
+            "alphaCleave" : "shell",
             "debug" : true
         }
     }
