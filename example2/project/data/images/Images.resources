@@ -27,6 +27,41 @@
         "type" : "image",
         "file" : "WeirdAlpha.png",
         "params" : {
+            "debug" : true
+        }
+    },
+    {
+        "name" : "RoseBud-mask.image",
+        "type" : "image",
+        "file" : "WeirdAlpha.png",
+        "params" : {
+            "alphaCleave" : "mask",
+            "debug" : true
+        }
+    },
+    {
+        "name" : "RoseBud-premultiply.image",
+        "type" : "image",
+        "file" : "WeirdAlpha.png",
+        "params" : {
+            "alphaCleave" : "premultiply",
+            "debug" : true
+        }
+    },
+    {
+        "name" : "RoseBud-lazy.image",
+        "type" : "image",
+        "file" : "WeirdAlpha.png",
+        "params" : {
+            "alphaCleave" : "lazy",
+            "debug" : true
+        }
+    },
+    {
+        "name" : "RoseBud-shell.image",
+        "type" : "image",
+        "file" : "WeirdAlpha.png",
+        "params" : {
             "alphaCleave" : "shell",
             "debug" : true
         }

@@ -150,6 +150,28 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
                     image = newImageData;
                     components = 3;
                 }
+                else if(alphaCleave == "mask") {
+                    std::cout << "\tAlpha cleave: mask" << std::endl;
+                    int size = width * height * 3;
+                    unsigned char* newImageData = new unsigned char[size];
+
+                    for(int y = 0; y < height; ++ y) {
+                        for(int x = 0; x < width; ++ x) {
+                            newImageData[(x + (y * width)) * 3 + 0] = image[(x + (y * width)) * components + 3];
+                            newImageData[(x + (y * width)) * 3 + 1] = image[(x + (y * width)) * components + 3];
+                            newImageData[(x + (y * width)) * 3 + 2] = image[(x + (y * width)) * components + 3];
+                        }
+                    }
+
+                    if(deleteFinalImage) {
+                        delete image;
+                    } else {
+                        stbi_image_free(image);
+                    }
+                    deleteFinalImage = true;
+                    image = newImageData;
+                    components = 3;
+                }
                 else if(alphaCleave == "shell") {
                     std::cout << "\tAlpha cleave: shell" << std::endl;
                     int size = width * height * 3;
