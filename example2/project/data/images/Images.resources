@@ -1,0 +1,32 @@
+[
+    {
+        "name" : "GreenJellyfish.image",
+        "type" : "image",
+        "file" : "GrnJelly.png"
+    },
+    {
+        "name" : "PurpleJellyfish.image",
+        "type" : "image",
+        "file" : "PrplJelly.jpeg"
+    },
+    {
+        "name" : "128Rose.image",
+        "type" : "image",
+        "file" : "512Rose.jpg",
+        "params" : {
+            "resize" : {
+                "absolute" : true,
+                "width" : 128,
+                "height" : 128
+            }
+        }
+    },
+    {
+        "name" : "RoseBud.image",
+        "type" : "image",
+        "file" : "WeirdAlpha.png",
+        "params" : {
+            "alphaCleave" : "premultiply"
+        }
+    }
+]

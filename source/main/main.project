@@ -4,9 +4,14 @@
   <Dependencies/>
   <VirtualDirectory Name="src">
     <File Name="main.cpp"/>
+    <File Name="ConvertImage.cpp"/>
+    <File Name="Convert.hpp"/>
+    <File Name="ConvertMiscellaneous.cpp"/>
   </VirtualDirectory>
-  <VirtualDirectory Name="jsoncpp">
-    <File Name="../../jsoncpp/dist/jsoncpp.cpp"/>
+  <VirtualDirectory Name="lib">
+    <VirtualDirectory Name="jsoncpp">
+      <File Name="../../jsoncpp/dist/jsoncpp.cpp"/>
+    </VirtualDirectory>
   </VirtualDirectory>
   <Settings Type="Executable">
     <GlobalSettings>
@@ -22,6 +27,7 @@
       <Compiler Options="-g;-O0;-Wall" C_Options="-g;-O0;-Wall" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" PCHFlags="" PCHFlagsPolicy="0">
         <IncludePath Value="."/>
         <IncludePath Value="../../jsoncpp/dist"/>
+        <IncludePath Value="../../stb"/>
       </Compiler>
       <Linker Options="" Required="yes">
         <Library Value="boost_system"/>

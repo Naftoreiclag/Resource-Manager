@@ -8,5 +8,10 @@
         "name" : "Hello.fragmentShader",
         "type" : "fragment-shader",
         "file" : "Hello.frag"
+    },
+    {
+        "name" : "Hello.shaderProgram",
+        "type" : "shader-program",
+        "file" : "Hello.prog"
     }
 ]

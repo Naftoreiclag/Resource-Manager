@@ -1,0 +1,11 @@
+{
+    "link" : [
+        "Hello.vertexShader",
+        "Hello.fragmentShader"
+    ],
+    "attributes" : [
+        "position" : "position",
+        "color" : "color"
+    ],
+    "fragDataLocation" : "fragColor"
+}

@@ -9,6 +9,8 @@
 
 #include "json/json.h"
 
+#include "Convert.hpp"
+
 enum ObjectType {
     IMAGE,
     MATERIAL,
@@ -22,24 +24,28 @@ enum ObjectType {
     OTHER
 };
 
-std::string translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize) {
+std::string translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params) {
+    std::string finalOutputName;
+
     switch(otype) {
         case MESH: {
             // TODO: something else
-            
-            boost::filesystem::copy_file(fromFile, outputFile);
+            finalOutputName = convertMiscellaneous(fromFile, outputFile, params);
+            break;
+        }
+        case IMAGE: {
+            finalOutputName = convertImage(fromFile, outputFile, params);
             break;
         }
         default: {
-            
-            boost::filesystem::copy_file(fromFile, outputFile);
+            finalOutputName = convertMiscellaneous(fromFile, outputFile, params);
             break;
         }
     }
     std::ifstream sizeTest(outputFile.c_str(), std::ios::binary | std::ios::ate);
     filesize = sizeTest.tellg();
     
-    return outputFile.filename().c_str();
+    return finalOutputName;
 }
 
 std::string typeToString(const ObjectType& tpe) {
@@ -94,6 +100,7 @@ public:
         ObjectType mType;
         boost::filesystem::path mFile;
         boost::filesystem::path mDebugOrigin;
+        Json::Value mParams;
     };
 
     boost::filesystem::path mFile;
@@ -108,6 +115,7 @@ public:
         object.mDebugOrigin = objectFile;
         object.mName = objectData["name"].asString();
         object.mType = stringToType(objectData["type"].asString());
+        object.mParams = objectData["params"];
         if(object.mType == OTHER) {
             std::cout << "Warning! Unknown resource type " << objectData["type"].asString() << " found in resource " << object.mName << " found at " << object.mDebugOrigin << std::endl;
         }
@@ -359,17 +367,17 @@ public:
             else {
                 outputObjectFile /= object.mFile.filename();
             }
-            
+
+            std::cout << object.mName << std::endl;
+
             uint32_t filesize;
-            std::string finalOutputName = translateData(object.mType, object.mFile, outputObjectFile, filesize);
+            std::string finalOutputName = translateData(object.mType, object.mFile, outputObjectFile, filesize, object.mParams);
             //
             Json::Value& objectDef = objectListData[jsonListIndex];
             objectDef["name"] = object.mName;
             objectDef["type"] = typeToString(object.mType);
             objectDef["file"] = finalOutputName;
             objectDef["size"] = filesize;
-            
-            std::cout << object.mName << std::endl;
             
             ++ jsonListIndex;
         }
