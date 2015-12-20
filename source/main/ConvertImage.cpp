@@ -26,12 +26,12 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
     bool deleteFinalImage = false;
 
     if(!params.isNull()) {
-        const Json::Value& resize = params["resize"];
 
         if(!params["debug"].isNull()) {
             writeAsDebug = params["debug"].asBool();
         }
 
+        const Json::Value& resize = params["resize"];
         if(!resize.isNull()) {
             bool absolute = true;
             int nWidth = width;
@@ -79,8 +79,74 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
                 width = nWidth;
                 height = nHeight;
                 image = new unsigned char[size];
+                // Copy because
                 for(int i = 0; i < size; ++ i) {
                     image[i] = tempImageData[i];
+                }
+            }
+        }
+
+        if(components > 3) {
+            if(!params["alphaCleave"].isNull()) {
+                std::string alphaCleave = params["alphaCleave"].asString();
+
+                if(alphaCleave == "premultiply") {
+                    int size = width * height * 3;
+                    unsigned char* newImageData = new unsigned char[size];
+
+                    for(int y = 0; y < height; ++ y) {
+                        for(int x = 0; x < width; ++ x) {
+                            unsigned char rn = image[(x + (y * width)) * components + 0];
+                            unsigned char gn = image[(x + (y * width)) * components + 1];
+                            unsigned char bn = image[(x + (y * width)) * components + 2];
+                            unsigned char an = image[(x + (y * width)) * components + 3];
+                            double rd = rn;
+                            double gd = gn;
+                            double bd = bn;
+                            double ad = an;
+                            rd /= 255.0;
+                            gd /= 255.0;
+                            bd /= 255.0;
+                            ad /= 255.0;
+                            unsigned char rf = rd * ad * 255;
+                            unsigned char gf = gd * ad * 255;
+                            unsigned char bf = bd * ad * 255;
+
+                            newImageData[(x + (y * width)) * 3 + 0] = rf;
+                            newImageData[(x + (y * width)) * 3 + 1] = gf;
+                            newImageData[(x + (y * width)) * 3 + 2] = bf;
+                        }
+                    }
+
+                    if(deleteFinalImage) {
+                        delete image;
+                    } else {
+                        stbi_image_free(image);
+                    }
+                    deleteFinalImage = true;
+                    image = newImageData;
+                    components = 3;
+                }
+                else if(alphaCleave == "lazy") {
+                    int size = width * height * 3;
+                    unsigned char* newImageData = new unsigned char[size];
+
+                    for(int y = 0; y < height; ++ y) {
+                        for(int x = 0; x < width; ++ x) {
+                            newImageData[(x + (y * width)) * 3 + 0] = image[(x + (y * width)) * components + 0];
+                            newImageData[(x + (y * width)) * 3 + 1] = image[(x + (y * width)) * components + 1];
+                            newImageData[(x + (y * width)) * 3 + 2] = image[(x + (y * width)) * components + 2];
+                        }
+                    }
+
+                    if(deleteFinalImage) {
+                        delete image;
+                    } else {
+                        stbi_image_free(image);
+                    }
+                    deleteFinalImage = true;
+                    image = newImageData;
+                    components = 3;
                 }
             }
         }
