@@ -31,6 +31,21 @@
         }
     },
     {
+        "name" : "RoseBud-distanceField.image",
+        "type" : "image",
+        "file" : "WeirdAlpha.png",
+        "params" : {
+            "distanceFild" : {
+                "absolute" : true,
+                "width" : 128,
+                "height" : 128,
+                "range" : 20,
+                "pass" : 0.5
+            },
+            "debug" : true
+        }
+    },
+    {
         "name" : "RoseBud-mask.image",
         "type" : "image",
         "file" : "WeirdAlpha.png",

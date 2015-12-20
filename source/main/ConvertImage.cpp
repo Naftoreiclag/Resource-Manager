@@ -31,6 +31,13 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
             writeAsDebug = params["debug"].asBool();
         }
 
+        const Json::Value& distanceField = params["distanceField"];
+        if(!distanceField.isNull()) {
+            bool absolute = true;
+            int nWidth = width;
+            int nHeight = height;
+        }
+
         const Json::Value& resize = params["resize"];
         if(!resize.isNull()) {
             bool absolute = true;
