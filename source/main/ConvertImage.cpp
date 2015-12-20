@@ -91,6 +91,7 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
                 std::string alphaCleave = params["alphaCleave"].asString();
 
                 if(alphaCleave == "premultiply") {
+                    std::cout << "\tAlpha cleave: premultiply" << std::endl;
                     int size = width * height * 3;
                     unsigned char* newImageData = new unsigned char[size];
 
@@ -128,6 +129,7 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
                     components = 3;
                 }
                 else if(alphaCleave == "lazy") {
+                    std::cout << "\tAlpha cleave: lazy" << std::endl;
                     int size = width * height * 3;
                     unsigned char* newImageData = new unsigned char[size];
 
@@ -148,45 +150,84 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
                     image = newImageData;
                     components = 3;
                 }
-                /*
                 else if(alphaCleave == "shell") {
+                    std::cout << "\tAlpha cleave: shell" << std::endl;
                     int size = width * height * 3;
                     unsigned char* newImageData = new unsigned char[size];
+
+                    unsigned char opp = 127;
 
                     for(int y = 0; y < height; ++ y) {
                         for(int x = 0; x < width; ++ x) {
 
                             unsigned char an = image[(x + (y * width)) * components + 3];
 
-                            if(an > 127) {
-                                newImageData[(x + (y * width)) * 3 + 0] = image[(x + (y * width)) * components + 0];
-                                newImageData[(x + (y * width)) * 3 + 1] = image[(x + (y * width)) * components + 1];
-                                newImageData[(x + (y * width)) * 3 + 2] = image[(x + (y * width)) * components + 2];
+                            unsigned char& finalR = newImageData[(x + (y * width)) * 3 + 0];
+                            unsigned char& finalG = newImageData[(x + (y * width)) * 3 + 1];
+                            unsigned char& finalB = newImageData[(x + (y * width)) * 3 + 2];
+
+                            if(an > opp) {
+                                finalR = image[(x + (y * width)) * components + 0];
+                                finalG = image[(x + (y * width)) * components + 1];
+                                finalB = image[(x + (y * width)) * components + 2];
                             }
                             else {
+                                std::cout << x << "\t" << y << std::endl;
                                 bool first = true;
+                                bool recalc = false;
                                 double closest;
-                                unsigned char rn, gn, bn;
-                                for(int y2 = 0; y2 < height; ++ y2) {
-                                    for(int x2 = 0; x2 < width; ++ x2) {
+                                int end = height > width ? height : width;
+                                for(int rad = 1; rad < end; ++ rad) {
+                                    for(int index = 0; index < 4; ++ index) {
+                                        /*
+                                         * 0  >  1
+                                         *
+                                         * ^     v
+                                         *
+                                         * 3  <  2
+                                         */
 
-                                        unsigned char alphaTest = image[(x2 + (y2 * width)) * components + 3];
+                                        int x2 = (index == 0 || index == 3) ? (x - rad) : (x + rad);
+                                        int y2 = (index == 0 || index == 1) ? (y - rad) : (y + rad);
 
-                                        if(alphaTest > 127) {
-                                            if(first) {
-                                                first = false;
-                                                closest = ((x - x2) * (x - x2)) + ((y - y2) * (y - y2));
+                                        for(int lear = 0; lear < rad; ++ lear) {
+                                            if(index == 0) {
+                                                ++ x2;
+                                            } else if(index == 1) {
+                                                ++ y2;
+                                            } else if(index == 2) {
+                                                -- x2;
+                                            } else if(index == 3) {
+                                                -- y2;
                                             }
-                                            else {
-                                                double maybe = ((x - x2) * (x - x2)) + ((y - y2) * (y - y2));
-                                                if(maybe < closest) {
-                                                    closest = maybe;
-                                                    newImageData[(x + (y * width)) * 3 + 0] = image[(x2 + (y2 * width)) * components + 0];
-                                                    newImageData[(x + (y * width)) * 3 + 1] = image[(x2 + (y2 * width)) * components + 1];
-                                                    newImageData[(x + (y * width)) * 3 + 2] = image[(x2 + (y2 * width)) * components + 2];
+
+                                            if(x2 < 0 || x2 >= width || y2 < 0 || y2 >= height) {
+                                                continue;
+                                            }
+
+                                            unsigned char alphaTest = image[(x2 + (y2 * width)) * components + 3];
+
+                                            if(alphaTest > opp) {
+                                                double dist = ((x - x2) * (x - x2)) + ((y - y2) * (y - y2));
+                                                if(first) {
+                                                    first = false;
+                                                    closest = dist;
+                                                }
+                                                else {
+                                                    if(dist < closest) {
+                                                        closest = dist;
+                                                        finalR = image[(x2 + (y2 * width)) * components + 0];
+                                                        finalG = image[(x2 + (y2 * width)) * components + 1];
+                                                        finalB = image[(x2 + (y2 * width)) * components + 2];
+                                                    }
                                                 }
                                             }
                                         }
+                                    }
+
+                                    if(!first && !recalc) {
+                                        end = (2 * rad < end) ? 2 * rad : end;
+                                        recalc = true;
                                     }
                                 }
                             }
@@ -202,7 +243,6 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
                     image = newImageData;
                     components = 3;
                 }
-                */
             }
         }
     }
