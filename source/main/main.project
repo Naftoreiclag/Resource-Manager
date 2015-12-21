@@ -10,7 +10,7 @@
   </VirtualDirectory>
   <VirtualDirectory Name="lib">
     <VirtualDirectory Name="jsoncpp">
-      <File Name="../../jsoncpp/dist/jsoncpp.cpp"/>
+      <File Name="../../libraries/jsoncpp/dist/jsoncpp.cpp"/>
     </VirtualDirectory>
   </VirtualDirectory>
   <Settings Type="Executable">
@@ -26,8 +26,8 @@
     <Configuration Name="Debug" CompilerType="GCC" DebuggerType="GNU gdb debugger" Type="Executable" BuildCmpWithGlobalSettings="append" BuildLnkWithGlobalSettings="append" BuildResWithGlobalSettings="append">
       <Compiler Options="-g;-O0;-Wall" C_Options="-g;-O0;-Wall" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" PCHFlags="" PCHFlagsPolicy="0">
         <IncludePath Value="."/>
-        <IncludePath Value="../../jsoncpp/dist"/>
-        <IncludePath Value="../../stb"/>
+        <IncludePath Value="../../libraries/jsoncpp/dist"/>
+        <IncludePath Value="../../libraries/stb"/>
       </Compiler>
       <Linker Options="" Required="yes">
         <Library Value="boost_system"/>
