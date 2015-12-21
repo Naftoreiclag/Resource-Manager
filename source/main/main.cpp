@@ -393,6 +393,30 @@ public:
         }
 
         if(useIntermediate) {
+            if(!boost::filesystem::exists(intermediateDir)) {
+                boost::filesystem::create_directories(intermediateDir);
+            }
+            std::cout << "Calculating hashes..." << std::endl;
+            for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
+
+                Object& object = *iter;
+
+                std::ifstream reader(object.mFile.c_str(), std::ios::binary | std::ios::ate);
+                object.mOriginalSize = reader.tellg();
+
+                char* totalData = new char[object.mOriginalSize];
+                reader.seekg(0, std::ios::beg);
+                reader.read(totalData, object.mOriginalSize);
+                reader.close();
+
+                MurmurHash3_x86_32(totalData, object.mOriginalSize, 1337, &(object.mOriginalHash));
+
+                delete[] totalData;
+
+                std::cout << "\t" << object.mOriginalHash << std::endl;
+            }
+            std::cout << std::endl;
+
             std::cout << "Checking for pre-compiled data..." << std::endl;
 
             boost::filesystem::path intermediateFile = intermediateDir / "intermediate.data";
@@ -414,7 +438,7 @@ public:
                     /*
                      * If a pre-compiled file exists with exactly the same:
                      *  Hash
-                     *  Configuration
+                     *  Configuration:
                      *      Type
                      *      Parameters
                      *
@@ -424,21 +448,6 @@ public:
 
                     Object& object = *iter;
 
-                    // Calculate hash
-                    {
-                        std::ifstream reader(object.mFile.c_str(), std::ios::binary | std::ios::ate);
-                        object.mOriginalSize = reader.tellg();
-
-                        char* totalData = new char[object.mOriginalSize];
-                        reader.seekg(0, std::ios::beg);
-                        reader.read(totalData, object.mOriginalSize);
-                        reader.close();
-
-                        MurmurHash3_x86_32(totalData, object.mOriginalSize, 1337, &(object.mOriginalHash));
-
-                        delete[] totalData;
-                    }
-
                     for(Json::Value::const_iterator meta = metadataList.begin(); meta != metadataList.end(); ++ meta) {
                         const Json::Value& metadata = *meta;
 
@@ -447,7 +456,7 @@ public:
                         const Json::Value& checkParams = metadata["params"];
 
                         if(checkHash == object.mOriginalHash && checkType == object.mType && equivalentJson(checkParams, object.mParams)) {
-                            std::cout << "/tHave pre-compiled copy of : " << object.mName << std::endl;
+                            std::cout << "\tCopy: " << object.mName << std::endl;
                             object.mSkipTranslate = true;
 
                             boost::filesystem::copy(intermediateDir / (metadata["file"].asString()), object.mOutputFile);
@@ -464,37 +473,89 @@ public:
         
         std::cout << "Translating data..." << std::endl;
         std::cout << std::endl;
-        
-        Json::Value outputPackageData;
-        Json::Value& objectListData = outputPackageData["resources"];
-        unsigned int jsonListIndex = 0;
-        for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
-            Object& object = *iter;
-
-            std::cout << object.mName << std::endl;
-
-            if(!object.mSkipTranslate) {
-                translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !obfuscate);
-            }
-            //
-            Json::Value& objectDef = objectListData[jsonListIndex];
-            objectDef["name"] = object.mName;
-            objectDef["type"] = typeToString(object.mType);
-            objectDef["file"] = object.mOutputFile.filename().c_str();
-            objectDef["size"] = object.mOutputSize;
-            
-            ++ jsonListIndex;
-        }
-        std::cout << std::endl;
-        
-        std::cout << "Exporting data.package... ";
         {
-            std::ofstream finalOutputFile((outputDir / "data.package").c_str());
-            finalOutputFile << outputPackageData;
-            finalOutputFile.close();
+            boost::filesystem::path intermediateFile = intermediateDir / "intermediate.data";
+            Json::Value intermediateData;
+            unsigned int metadataIndex = 0;
+            if(useIntermediate) {
+                if(boost::filesystem::exists(intermediateFile)) {
+                    std::ifstream reader(intermediateFile.c_str());
+                    reader >> intermediateData;
+                    reader.close();
+                    metadataIndex = intermediateData["metadata"].size();
+                }
+            }
+
+            Json::Value outputPackageData;
+            Json::Value& objectListData = outputPackageData["resources"];
+            unsigned int jsonListIndex = 0;
+
+            for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
+                Object& object = *iter;
+
+                std::cout << object.mName << std::endl;
+
+                if(!object.mSkipTranslate) {
+                    translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !obfuscate);
+
+                    if(useIntermediate) {
+                        Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];
+
+                        objectMetadata["hash"] = (Json::Int64) (object.mOriginalHash);
+                        objectMetadata["type"] = typeToString(object.mType);
+                        objectMetadata["params"] = object.mParams;
+
+                        std::stringstream ss;
+                        ss << object.mName;
+                        ss << typeToString(object.mType);
+                        ss << "-";
+                        ss << ((unsigned int) (object.mOriginalHash));
+                        ss << ".i";
+                        std::string intermFilename = ss.str();
+
+                        objectMetadata["file"] = intermFilename;
+
+                        // copy file
+                        boost::filesystem::path copyTo = intermediateDir / intermFilename;
+                        if(boost::filesystem::exists(copyTo)) {
+                            boost::filesystem::remove(copyTo);
+                        }
+                        boost::filesystem::copy(object.mOutputFile, copyTo);
+
+                        ++ metadataIndex;
+                    }
+                }
+                //
+                Json::Value& objectDef = objectListData[jsonListIndex];
+                objectDef["name"] = object.mName;
+                objectDef["type"] = typeToString(object.mType);
+                objectDef["file"] = object.mOutputFile.filename().c_str();
+                objectDef["size"] = object.mOutputSize;
+
+                ++ jsonListIndex;
+            }
+            std::cout << std::endl;
+
+            if(useIntermediate) {
+                std::cout << "Exporting intermediate.data... ";
+                {
+                    std::ofstream intermOutput(intermediateFile.c_str());
+                    intermOutput << intermediateData;
+                    intermOutput.close();
+                }
+                std::cout << "Done!" << std::endl;
+                std::cout << std::endl;
+            }
+
+            std::cout << "Exporting data.package... ";
+            {
+                std::ofstream finalOutputFile((outputDir / "data.package").c_str());
+                finalOutputFile << outputPackageData;
+                finalOutputFile.close();
+            }
+            std::cout << "Done!" << std::endl;
+            std::cout << std::endl;
         }
-        std::cout << "Done!" << std::endl;
-        std::cout << std::endl;
         
         return true;
     }
