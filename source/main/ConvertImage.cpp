@@ -78,7 +78,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
                 stbir_resize_uint8(image, width, height, 0, tempImageData, nWidth, nHeight, 0, components);
                 if(deleteFinalImage) {
-                    delete image;
+                    delete[] image;
                 } else {
                     stbi_image_free(image);
                 }
@@ -127,7 +127,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     }
 
                     if(deleteFinalImage) {
-                        delete image;
+                        delete[] image;
                     } else {
                         stbi_image_free(image);
                     }
@@ -149,7 +149,35 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     }
 
                     if(deleteFinalImage) {
-                        delete image;
+                        delete[] image;
+                    } else {
+                        stbi_image_free(image);
+                    }
+                    deleteFinalImage = true;
+                    image = newImageData;
+                    components = 3;
+                }
+                else if(alphaCleave == "clamp") {
+                    std::cout << "\tAlpha cleave: clamp" << std::endl;
+                    int size = width * height * 3;
+                    unsigned char* newImageData = new unsigned char[size];
+
+                    for(int y = 0; y < height; ++ y) {
+                        for(int x = 0; x < width; ++ x) {
+                            if(image[(x + (y * width)) * components + 3] > 0) {
+                                newImageData[(x + (y * width)) * 3 + 0] = image[(x + (y * width)) * components + 0];
+                                newImageData[(x + (y * width)) * 3 + 1] = image[(x + (y * width)) * components + 1];
+                                newImageData[(x + (y * width)) * 3 + 2] = image[(x + (y * width)) * components + 2];
+                            } else {
+                                newImageData[(x + (y * width)) * 3 + 0] = 255;
+                                newImageData[(x + (y * width)) * 3 + 1] = 0;
+                                newImageData[(x + (y * width)) * 3 + 2] = 255;
+                            }
+                        }
+                    }
+
+                    if(deleteFinalImage) {
+                        delete[] image;
                     } else {
                         stbi_image_free(image);
                     }
@@ -171,7 +199,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     }
 
                     if(deleteFinalImage) {
-                        delete image;
+                        delete[] image;
                     } else {
                         stbi_image_free(image);
                     }
@@ -179,12 +207,13 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     image = newImageData;
                     components = 3;
                 }
-                else if(alphaCleave == "shell") {
-                    std::cout << "\tAlpha cleave: shell" << std::endl;
+                else if(alphaCleave == "shell" || alphaCleave == "shellhq") {
+                    bool highQuality = (alphaCleave == "shellhq");
+                    std::cout << "\tAlpha cleave: shell" << (highQuality ? "hq" : "") << std::endl;
                     int size = width * height * 3;
                     unsigned char* newImageData = new unsigned char[size];
 
-                    unsigned char opp = 0;
+                    unsigned char opp = 127;
 
                     double total = width * height;
                     int percentDone = 0;
@@ -210,32 +239,8 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                 bool recalc = false;
 
                                 double closest;
-
-                                /*
-                                // Brute force
-                                for(int y2 = 0; y2 < height; ++ y2) {
-                                    for(int x2 = 0; x2 < width; ++ x2) {
-                                        if(image[(x2 + (y2 * width)) * components + 3] > opp) {
-                                            double dist = ((x - x2) * (x - x2)) + ((y - y2) * (y - y2));
-                                            if(first) {
-                                                first = false;
-                                                closest = dist;
-                                                finalR = image[(x2 + (y2 * width)) * components + 0];
-                                                finalG = image[(x2 + (y2 * width)) * components + 1];
-                                                finalB = image[(x2 + (y2 * width)) * components + 2];
-                                            }
-                                            else {
-                                                if(dist < closest) {
-                                                    closest = dist;
-                                                    finalR = image[(x2 + (y2 * width)) * components + 0];
-                                                    finalG = image[(x2 + (y2 * width)) * components + 1];
-                                                    finalB = image[(x2 + (y2 * width)) * components + 2];
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                */
+                                int closestX;
+                                int closestY;
 
                                 // Slightly more efficient
 
@@ -283,16 +288,14 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                                 if(first) {
                                                     first = false;
                                                     closest = dist;
-                                                    finalR = image[(x2 + (y2 * width)) * components + 0];
-                                                    finalG = image[(x2 + (y2 * width)) * components + 1];
-                                                    finalB = image[(x2 + (y2 * width)) * components + 2];
+                                                    closestX = x2;
+                                                    closestY = y2;
                                                 }
                                                 else {
                                                     if(dist < closest) {
                                                         closest = dist;
-                                                        finalR = image[(x2 + (y2 * width)) * components + 0];
-                                                        finalG = image[(x2 + (y2 * width)) * components + 1];
-                                                        finalB = image[(x2 + (y2 * width)) * components + 2];
+                                                        closestX = x2;
+                                                        closestY = y2;
                                                     }
                                                 }
                                             }
@@ -306,6 +309,51 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                         recalc = true;
                                     }
                                 }
+
+                                if(highQuality) {
+                                    int sampleRad = (width > height ? width : height) / 20;
+                                    if(sampleRad < 1) {
+                                        sampleRad = 1;
+                                    }
+
+                                    double avgR = 0;
+                                    double avgG = 0;
+                                    double avgB = 0;
+                                    int numSamples = 0;
+
+                                    for(int dx = -sampleRad; dx <= sampleRad; ++ dx) {
+                                        for(int dy = -sampleRad; dy <= sampleRad; ++ dy) {
+
+                                            int sampleX = closestX + dx;
+                                            int sampleY = closestY + dy;
+
+                                            if(sampleX < 0 || sampleX >= width || sampleY < 0 || sampleY >= height) {
+                                                continue;
+                                            }
+
+                                            if(image[(sampleX + (sampleY * width)) * components + 3] > opp) {
+                                                avgR += image[(sampleX + (sampleY * width)) * components + 0];
+                                                avgG += image[(sampleX + (sampleY * width)) * components + 1];
+                                                avgB += image[(sampleX + (sampleY * width)) * components + 2];
+                                                ++ numSamples;
+                                            }
+                                        }
+                                    }
+
+                                    avgR /= numSamples;
+                                    avgG /= numSamples;
+                                    avgB /= numSamples;
+
+                                    finalR = (unsigned char) avgR;
+                                    finalG = (unsigned char) avgG;
+                                    finalB = (unsigned char) avgB;
+                                }
+                                else {
+                                    finalR = image[(closestX + (closestY * width)) * components + 0];
+                                    finalG = image[(closestX + (closestY * width)) * components + 1];
+                                    finalB = image[(closestX + (closestY * width)) * components + 2];
+                                }
+
                             }
 
                             progress += 1;
@@ -319,7 +367,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     }
 
                     if(deleteFinalImage) {
-                        delete image;
+                        delete[] image;
                     } else {
                         stbi_image_free(image);
                     }
@@ -365,7 +413,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
     outputData.close();
 
     if(deleteFinalImage) {
-        delete image;
+        delete[] image;
     }
     else {
         stbi_image_free(image);

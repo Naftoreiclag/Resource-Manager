@@ -86,7 +86,7 @@
         "type" : "image",
         "file" : "ExpensiveResource.png",
         "params" : {
-            "alphaCleave" : "lazy",
+            "alphaCleave" : "shell",
             "debug" : true
         }
     },
@@ -95,7 +95,16 @@
         "type" : "image",
         "file" : "ExpensiveResource.png",
         "params" : {
-            "alphaCleave" : "shell",
+            "alphaCleave" : "shellhq",
+            "debug" : true
+        }
+    },
+    {
+        "name" : "ExpensiveResource3.image",
+        "type" : "image",
+        "file" : "ExpensiveResource.png",
+        "params" : {
+            "alphaCleave" : "clamp",
             "debug" : true
         }
     }
