@@ -12,6 +12,9 @@
     <VirtualDirectory Name="jsoncpp">
       <File Name="../../libraries/jsoncpp/dist/jsoncpp.cpp"/>
     </VirtualDirectory>
+    <VirtualDirectory Name="murmur3">
+      <File Name="../../libraries/murmur3/MurmurHash3.cpp"/>
+    </VirtualDirectory>
   </VirtualDirectory>
   <Settings Type="Executable">
     <GlobalSettings>
@@ -28,6 +31,7 @@
         <IncludePath Value="."/>
         <IncludePath Value="../../libraries/jsoncpp/dist"/>
         <IncludePath Value="../../libraries/stb"/>
+        <IncludePath Value="../../libraries/murmur3"/>
       </Compiler>
       <Linker Options="" Required="yes">
         <Library Value="boost_system"/>

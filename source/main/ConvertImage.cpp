@@ -10,7 +10,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-std::string convertImage(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
+void convertImage(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
 
     int width;
     int height;
@@ -19,7 +19,7 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
 
     if(!image) {
         std::cout << "\tFailed to read image!" << std::endl;
-        return "";
+        return;
     }
 
     bool writeAsDebug = false;
@@ -184,7 +184,7 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
                     int size = width * height * 3;
                     unsigned char* newImageData = new unsigned char[size];
 
-                    unsigned char opp = 127;
+                    unsigned char opp = 0;
 
                     double total = width * height;
                     int percentDone = 0;
@@ -341,7 +341,7 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
 
         if(result > 0) {
             std::cout << "\tWritten as debug!" << std::endl;
-            return outputFile.filename().c_str();
+            return;
         }
         else {
             std::cout << "\tFailed to write as debug!" << std::endl;
@@ -371,5 +371,5 @@ std::string convertImage(const boost::filesystem::path& fromFile, const boost::f
         stbi_image_free(image);
     }
 
-    return outputFile.filename().c_str();
+    return;
 }
