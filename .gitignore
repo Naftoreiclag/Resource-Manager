@@ -13,5 +13,6 @@ source/Makefile
 
 example/output/*
 example2/output/*
+example2/intermediate/*
 
 libraries/*
