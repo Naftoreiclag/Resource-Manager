@@ -80,5 +80,23 @@
             "alphaCleave" : "shell",
             "debug" : true
         }
+    },
+    {
+        "name" : "ExpensiveResource1.image",
+        "type" : "image",
+        "file" : "ExpensiveResource.png",
+        "params" : {
+            "alphaCleave" : "lazy",
+            "debug" : true
+        }
+    },
+    {
+        "name" : "ExpensiveResource2.image",
+        "type" : "image",
+        "file" : "ExpensiveResource.png",
+        "params" : {
+            "alphaCleave" : "shell",
+            "debug" : true
+        }
     }
 ]
