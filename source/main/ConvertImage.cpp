@@ -384,7 +384,8 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
     std::cout << "\tComponents: " << components << std::endl;
     std::cout << "\tRaw array size: " << (width * height * components) << std::endl;
 
-    if(writeAsDebug) {
+    //if(writeAsDebug) {
+    if(true) {
         int result = stbi_write_png(outputFile.c_str(), width, height, components, image, 0);
 
         if(result > 0) {
