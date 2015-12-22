@@ -24,7 +24,8 @@ enum ObjectType {
     VERTEX_SHADER,
     FRAGMENT_SHADER,
     GEOMETRY_SHADER,
-    TEXT,
+    STRING,
+    TEXTURE,
     
     OTHER
 };
@@ -59,7 +60,8 @@ std::string typeToString(const ObjectType& tpe) {
         case VERTEX_SHADER: return "vertex-shader";
         case FRAGMENT_SHADER: return "fragment-shader";
         case GEOMETRY_SHADER: return "geometry-shader";
-        case TEXT: return "text";
+        case STRING: return "string";
+        case TEXTURE: return "texture";
         default: return "other";
     }
 }
@@ -86,8 +88,11 @@ ObjectType stringToType(const std::string& str) {
     if(str == "geometry-shader") {
         return GEOMETRY_SHADER;
     } else 
-    if(str == "text") {
-        return TEXT;
+    if(str == "string") {
+        return STRING;
+    } else
+    if(str == "texture") {
+        return TEXTURE;
     }
     return OTHER;
 }
