@@ -18,17 +18,13 @@
                 "absolute" : true,
                 "width" : 128,
                 "height" : 128
-            },
-            "debug" : true
+            }
         }
     },
     {
         "name" : "RoseBud.image",
         "type" : "image",
-        "file" : "WeirdAlpha.png",
-        "params" : {
-            "debug" : true
-        }
+        "file" : "WeirdAlpha.png"
     },
     {
         "name" : "RoseBud-distanceField.image",
@@ -41,8 +37,7 @@
                 "height" : 128,
                 "range" : 20,
                 "pass" : 0.5
-            },
-            "debug" : true
+            }
         }
     },
     {
@@ -50,8 +45,7 @@
         "type" : "image",
         "file" : "WeirdAlpha.png",
         "params" : {
-            "alphaCleave" : "mask",
-            "debug" : true
+            "alphaCleave" : "mask"
         }
     },
     {
@@ -59,8 +53,7 @@
         "type" : "image",
         "file" : "WeirdAlpha.png",
         "params" : {
-            "alphaCleave" : "premultiply",
-            "debug" : true
+            "alphaCleave" : "premultiply"
         }
     },
     {
@@ -68,8 +61,7 @@
         "type" : "image",
         "file" : "WeirdAlpha.png",
         "params" : {
-            "alphaCleave" : "lazy",
-            "debug" : true
+            "alphaCleave" : "lazy"
         }
     },
     {
@@ -77,8 +69,15 @@
         "type" : "image",
         "file" : "WeirdAlpha.png",
         "params" : {
-            "alphaCleave" : "shell",
-            "debug" : true
+            "alphaCleave" : "shell"
+        }
+    },
+    {
+        "name" : "RoseBud-shellhq.image",
+        "type" : "image",
+        "file" : "WeirdAlpha.png",
+        "params" : {
+            "alphaCleave" : "shellhq"
         }
     },
     {
@@ -86,8 +85,7 @@
         "type" : "image",
         "file" : "ExpensiveResource.png",
         "params" : {
-            "alphaCleave" : "shell",
-            "debug" : true
+            "alphaCleave" : "shell"
         }
     },
     {
@@ -95,8 +93,7 @@
         "type" : "image",
         "file" : "ExpensiveResource.png",
         "params" : {
-            "alphaCleave" : "shellhq",
-            "debug" : true
+            "alphaCleave" : "shellhq"
         }
     },
     {
@@ -104,8 +101,7 @@
         "type" : "image",
         "file" : "ExpensiveResource.png",
         "params" : {
-            "alphaCleave" : "clamp",
-            "debug" : true
+            "alphaCleave" : "clamp"
         }
     }
 ]

@@ -1,7 +1,12 @@
 #version 330
 in vec3 vertColor;
+in vec2 vertTexCoord;
+
+uniform sampler2D ambientTex;
+
 out vec4 fragColor;
 
 void main() {
-    fragColor = vec4(vertColor, 1.0);
+    fragColor = texture(ambientTex, vertTexCoord);
+    
 }
