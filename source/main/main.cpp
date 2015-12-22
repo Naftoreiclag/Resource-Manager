@@ -243,7 +243,7 @@ public:
         
         if(boost::filesystem::exists(outputDir)) {
             if(forceOverwriteOutput) {
-                boost::filesystem::remove_all(outputDir);
+                //boost::filesystem::remove_all(outputDir);
             }
             else {
                 std::cout << "Warning! Output directory " << outputDir << " already exists!" << std::endl;
@@ -267,13 +267,18 @@ public:
                 
                 // Overwrite
                 if(decision) {
-                    boost::filesystem::remove_all(outputDir);
+                    //boost::filesystem::remove_all(outputDir);
                 }
                 
                 // Cancel
                 else {
                     return false;
                 }
+            }
+
+            boost::filesystem::directory_iterator directoryEnd;
+            for(boost::filesystem::directory_iterator dirIter(outputDir); dirIter != directoryEnd; ++ dirIter) {
+                boost::filesystem::remove_all(*dirIter);
             }
         }
         boost::filesystem::create_directories(outputDir);
