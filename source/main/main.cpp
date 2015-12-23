@@ -19,7 +19,6 @@ bool equivalentJson(const Json::Value& val1, const Json::Value& val2) {
 enum ObjectType {
     IMAGE,
     MATERIAL,
-    MESH,
     MODEL,
     VERTEX_SHADER,
     FRAGMENT_SHADER,
@@ -31,14 +30,14 @@ enum ObjectType {
     OTHER
 };
 
+// For debugging WIP converters
+bool isWorkInProgressType(const ObjectType& type) {
+    return type == GEOMETRY;
+}
+
 void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
 
     switch(otype) {
-        case MESH: {
-            // TODO: something else
-            convertMiscellaneous(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
         case IMAGE: {
             convertImage(fromFile, outputFile, params, modifyFilename);
             break;
@@ -60,7 +59,6 @@ std::string typeToString(const ObjectType& tpe) {
     switch(tpe) {
         case IMAGE: return "image";
         case MATERIAL: return "material";
-        case MESH: return "mesh";
         case MODEL: return "model";
         case VERTEX_SHADER: return "vertex-shader";
         case FRAGMENT_SHADER: return "fragment-shader";
@@ -77,8 +75,6 @@ ObjectType stringToType(const std::string& str) {
         return IMAGE;
     } else if(str == "material") {
         return MATERIAL;
-    } else if(str == "mesh") {
-        return MESH;
     } else if(str == "model") {
         return MODEL;
     } else if(str == "vertex-shader") {
@@ -465,7 +461,7 @@ public:
                         ObjectType checkType = stringToType(metadata["type"].asString());
                         const Json::Value& checkParams = metadata["params"];
 
-                        if(checkHash == object.mOriginalHash && checkType == object.mType && equivalentJson(checkParams, object.mParams)) {
+                        if(checkHash == object.mOriginalHash && checkType == object.mType && equivalentJson(checkParams, object.mParams) && !isWorkInProgressType(object.mType)) {
                             std::cout << "\tCopy: " << object.mName << std::endl;
                             object.mSkipTranslate = true;
 
@@ -504,9 +500,11 @@ public:
                 Object& object = *iter;
 
                 std::cout << object.mName << std::endl;
+                std::cout << "\t" << typeToString(object.mType) << std::endl;
 
-                if(!object.mSkipTranslate) {
+                if(!object.mSkipTranslate || isWorkInProgressType(object.mType)) {
                     translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !obfuscate);
+
 
                     if(useIntermediate) {
                         Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];

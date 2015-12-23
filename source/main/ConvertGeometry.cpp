@@ -11,7 +11,7 @@
 void debugAiNode(const aiScene* scene, const aiNode* node, unsigned int depth) {
 
     for(int c = 0; c < depth; ++ c) {
-        std::cout << "  ";
+        std::cout << "\t";
     }
 
     std::cout << node->mName.C_Str();
@@ -55,7 +55,6 @@ void debugAiNode(const aiScene* scene, const aiNode* node, unsigned int depth) {
     for(unsigned int i = 0; i < numChildren; ++ i) {
         debugAiNode(scene, node->mChildren[i], depth + 1);
     }
-
 }
 
 void convertGeometry(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
@@ -64,7 +63,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
 
     const aiNode* rootNode = scene->mRootNode;
 
-    debugAiNode(scene, rootNode, 0);
+    debugAiNode(scene, rootNode, 1);
 
     boost::filesystem::copy_file(fromFile, outputFile);
 }

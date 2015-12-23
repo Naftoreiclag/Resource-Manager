@@ -2,6 +2,7 @@
     {
         "name" : "Cube.geometry",
         "type" : "geometry",
-        "file" : "Cube.obj"
+        "file" : "Cube.obj",
+        "track" : "Cube.mtl"
     }
 ]
