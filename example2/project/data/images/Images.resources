@@ -65,27 +65,11 @@
         }
     },
     {
-        "name" : "RoseBud-shell.image",
-        "type" : "image",
-        "file" : "WeirdAlpha.png",
-        "params" : {
-            "alphaCleave" : "shell"
-        }
-    },
-    {
         "name" : "RoseBud-shellhq.image",
         "type" : "image",
         "file" : "WeirdAlpha.png",
         "params" : {
             "alphaCleave" : "shellhq"
-        }
-    },
-    {
-        "name" : "ExpensiveResource1.image",
-        "type" : "image",
-        "file" : "ExpensiveResource.png",
-        "params" : {
-            "alphaCleave" : "shell"
         }
     },
     {

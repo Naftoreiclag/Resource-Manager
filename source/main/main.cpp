@@ -26,6 +26,7 @@ enum ObjectType {
     GEOMETRY_SHADER,
     STRING,
     TEXTURE,
+    GEOMETRY,
     
     OTHER
 };
@@ -40,6 +41,10 @@ void translateData(const ObjectType& otype, const boost::filesystem::path& fromF
         }
         case IMAGE: {
             convertImage(fromFile, outputFile, params, modifyFilename);
+            break;
+        }
+        case GEOMETRY: {
+            convertGeometry(fromFile, outputFile, params, modifyFilename);
             break;
         }
         default: {
@@ -62,6 +67,7 @@ std::string typeToString(const ObjectType& tpe) {
         case GEOMETRY_SHADER: return "geometry-shader";
         case STRING: return "string";
         case TEXTURE: return "texture";
+        case GEOMETRY: return "geometry";
         default: return "other";
     }
 }
@@ -69,30 +75,24 @@ std::string typeToString(const ObjectType& tpe) {
 ObjectType stringToType(const std::string& str) {
     if(str == "image") {
         return IMAGE;
-    } else 
-    if(str == "material") {
+    } else if(str == "material") {
         return MATERIAL;
-    } else 
-    if(str == "mesh") {
+    } else if(str == "mesh") {
         return MESH;
-    } else 
-    if(str == "model") {
+    } else if(str == "model") {
         return MODEL;
-    } else 
-    if(str == "vertex-shader") {
+    } else if(str == "vertex-shader") {
         return VERTEX_SHADER;
-    } else 
-    if(str == "fragment-shader") {
+    } else if(str == "fragment-shader") {
         return FRAGMENT_SHADER;
-    } else 
-    if(str == "geometry-shader") {
+    } else if(str == "geometry-shader") {
         return GEOMETRY_SHADER;
-    } else 
-    if(str == "string") {
+    } else if(str == "string") {
         return STRING;
-    } else
-    if(str == "texture") {
+    } else if(str == "texture") {
         return TEXTURE;
+    } else if(str == "geometry") {
+        return GEOMETRY;
     }
     return OTHER;
 }
@@ -576,20 +576,12 @@ int main(int argc, char* argv[]) {
         std::cout << "\n"
         "\nCompiles a resource project into a load-ready resource package."
         "\n"
-        "\nUsage: MACBETH [options] source"
-        "\n"
-        "\nOptions:"
-        "\n\t-o\tForce overwrite previous exports"
-        "\n"
-        "\n"
-        "\n"
+        "\nUsage: MACBETH source"
         "\n"
         ;
         
         return 0;
     }
-    
-    
     
     Project project;
     project.process(argv[1]);

@@ -2,6 +2,6 @@
     "image" : "GreenJellyfish.image",
     "minFilter" : "linear",
     "magFilter" : "linear",
-    "wrapX" : "repeat",
-    "wrapY" : "repeat"
+    "wrapX" : "clampToEdge",
+    "wrapY" : "clampToEdge"
 }

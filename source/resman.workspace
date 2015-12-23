@@ -7,7 +7,7 @@
       <Project Name="main" ConfigName="Debug"/>
       <Project Name="loader" ConfigName="Debug"/>
     </WorkspaceConfiguration>
-    <WorkspaceConfiguration Name="Release" Selected="yes">
+    <WorkspaceConfiguration Name="Release" Selected="no">
       <Project Name="main" ConfigName="Release"/>
       <Project Name="loader" ConfigName="Release"/>
     </WorkspaceConfiguration>
