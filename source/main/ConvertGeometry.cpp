@@ -10,27 +10,17 @@
 #include "assimp/anim.h"
 
 void writeU32(std::ofstream& output, const uint32_t& value) {
-    char data[4];
-    data[0] = (value >> 24) & 0xFF;
-    data[1] = (value >> 16) & 0xFF;
-    data[2] = (value >> 8) & 0xFF;
-    data[3] = value & 0xFF;
-
-    output.write(data, sizeof data);
+    output.write((char*) &value, sizeof value);
 }
 
 void writeBool(std::ofstream& output, const bool& value) {
-    char data[1];
-    data[0] = value ? 1 : 0;
-    output.write(data, sizeof data);
+    char data;
+    data = value ? 1 : 0;
+    output.write(&data, sizeof data);
 }
 
 void writeU16(std::ofstream& output, const uint16_t& value) {
-    char data[2];
-    data[0] = (value >> 8) & 0xFF;
-    data[1] = value & 0xFF;
-
-    output.write(data, sizeof data);
+    output.write((char*) &value, sizeof value);
 }
 
 void writeU8(std::ofstream& output, const uint8_t& value) {
@@ -38,15 +28,7 @@ void writeU8(std::ofstream& output, const uint8_t& value) {
 }
 
 void writeF32(std::ofstream& output, const float& value) {
-    char data[4];
-    uint32_t& thirtytwo = *((uint32_t*) &value);
-
-    data[0] = (thirtytwo >> 24) & 0xFF;
-    data[1] = (thirtytwo >> 16) & 0xFF;
-    data[2] = (thirtytwo >> 8) & 0xFF;
-    data[3] = thirtytwo & 0xFF;
-
-    output.write(data, sizeof data);
+    output.write((char*) &value, sizeof value);
 }
 
 void debugAiNode(const aiScene* scene, const aiNode* node, unsigned int depth) {
@@ -204,10 +186,8 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         }
         if(mesh.useUV) {
             const aiVector3D& aUV = aMesh->mTextureCoords[0][i];
-            //if(aUV) {
-                vertex.u = aUV.x;
-                vertex.v = aUV.y;
-            //}
+            vertex.u = aUV.x;
+            vertex.v = aUV.y;
         }
 
         mesh.vertices.push_back(vertex);
