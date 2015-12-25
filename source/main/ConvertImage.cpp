@@ -389,7 +389,6 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
         int result = stbi_write_png(outputFile.c_str(), width, height, components, image, 0);
 
         if(result > 0) {
-            std::cout << "\tWritten as debug!" << std::endl;
             return;
         }
         else {
