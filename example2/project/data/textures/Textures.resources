@@ -3,5 +3,10 @@
         "name" : "GreenJellyfish.texture",
         "type" : "texture",
         "file" : "GrnJelly.texture"
+    },
+    {
+        "name" : "128Rose.texture",
+        "type" : "texture",
+        "file" : "128Rose.texture"
     }
 ]

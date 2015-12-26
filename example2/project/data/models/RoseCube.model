@@ -1,0 +1,8 @@
+{
+    "solids" : [
+        {
+            "geometry" : "Cube.geometry",
+            "material" : "128Rose.material"
+        }
+    ]
+}

@@ -3,11 +3,11 @@
   <Project Name="main" Path="main/main.project" Active="Yes"/>
   <Project Name="loader" Path="loader/loader.project" Active="No"/>
   <BuildMatrix>
-    <WorkspaceConfiguration Name="Debug" Selected="yes">
+    <WorkspaceConfiguration Name="Debug" Selected="no">
       <Project Name="main" ConfigName="Debug"/>
       <Project Name="loader" ConfigName="Debug"/>
     </WorkspaceConfiguration>
-    <WorkspaceConfiguration Name="Release" Selected="no">
+    <WorkspaceConfiguration Name="Release" Selected="yes">
       <Project Name="main" ConfigName="Release"/>
       <Project Name="loader" ConfigName="Release"/>
     </WorkspaceConfiguration>

@@ -2,7 +2,7 @@
     {
         "name" : "Cube.geometry",
         "type" : "geometry",
-        "file" : "Cube.obj",
+        "file" : "Cube.fbx",
         "track" : "Cube.mtl"
     }
 ]

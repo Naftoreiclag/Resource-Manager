@@ -18,3 +18,4 @@ example2/output/*
 example2/intermediate/*
 
 libraries/*
+/example2/project/data/geometry/Cube.blend1

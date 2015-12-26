@@ -3,9 +3,20 @@
         "Hello.vertexShader",
         "Hello.fragmentShader"
     ],
-    "attributes" : [
+    "attributes" : {
         "position" : "position",
-        "color" : "color"
-    ],
-    "fragDataLocation" : "fragColor"
+        "color" : "color",
+        "uv" : "texCoord"
+    },
+    "uniforms" : {
+        "modelMat" : "uModel",
+        "viewMat" : "uView",
+        "projMat" : "uProj"
+    },
+    "controls" : {
+        "sampler2D" : [
+            "ambientTex"
+        ]
+    },
+    "fragOutput" : "fragColor"
 }

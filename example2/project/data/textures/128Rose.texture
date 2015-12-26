@@ -1,0 +1,7 @@
+{
+    "image" : "128Rose.image",
+    "minFilter" : "linear",
+    "magFilter" : "linear",
+    "wrapX" : "clampToEdge",
+    "wrapY" : "clampToEdge"
+}
