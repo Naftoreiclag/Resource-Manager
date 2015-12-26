@@ -23,9 +23,11 @@ enum ObjectType {
     VERTEX_SHADER,
     FRAGMENT_SHADER,
     GEOMETRY_SHADER,
+    SHADER_PROGRAM,
     STRING,
     TEXTURE,
     GEOMETRY,
+
     
     OTHER
 };
@@ -63,6 +65,7 @@ std::string typeToString(const ObjectType& tpe) {
         case VERTEX_SHADER: return "vertex-shader";
         case FRAGMENT_SHADER: return "fragment-shader";
         case GEOMETRY_SHADER: return "geometry-shader";
+        case SHADER_PROGRAM: return "shader-program";
         case STRING: return "string";
         case TEXTURE: return "texture";
         case GEOMETRY: return "geometry";
@@ -83,6 +86,8 @@ ObjectType stringToType(const std::string& str) {
         return FRAGMENT_SHADER;
     } else if(str == "geometry-shader") {
         return GEOMETRY_SHADER;
+    } else if(str == "shader-program") {
+        return SHADER_PROGRAM;
     } else if(str == "string") {
         return STRING;
     } else if(str == "texture") {
@@ -379,7 +384,7 @@ public:
 
         // Do some important pre-calculations
         {
-            unsigned int seqName = 0;
+            uint32_t seqName = 0;
             for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
                 Object& object = *iter;
 
@@ -482,7 +487,7 @@ public:
         {
             boost::filesystem::path intermediateFile = intermediateDir / "intermediate.data";
             Json::Value intermediateData;
-            unsigned int metadataIndex = 0;
+            uint32_t metadataIndex = 0;
             if(useIntermediate) {
                 if(boost::filesystem::exists(intermediateFile)) {
                     std::ifstream reader(intermediateFile.c_str());
@@ -492,9 +497,11 @@ public:
                 }
             }
 
+            uint64_t totalSize = 0;
+
             Json::Value outputPackageData;
             Json::Value& objectListData = outputPackageData["resources"];
-            unsigned int jsonListIndex = 0;
+            uint32_t jsonListIndex = 0;
 
             for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
                 Object& object = *iter;
@@ -517,7 +524,7 @@ public:
                         ss << object.mName;
                         ss << typeToString(object.mType);
                         ss << "-";
-                        ss << ((unsigned int) (object.mOriginalHash));
+                        ss << ((uint32_t) (object.mOriginalHash));
                         ss << ".i";
                         std::string intermFilename = ss.str();
 
@@ -540,6 +547,8 @@ public:
                 objectDef["file"] = object.mOutputFile.filename().c_str();
                 objectDef["size"] = object.mOutputSize;
 
+                totalSize += object.mOutputSize;
+
                 ++ jsonListIndex;
             }
             std::cout << std::endl;
@@ -556,6 +565,9 @@ public:
             }
 
             std::cout << "Exporting data.package... ";
+
+            Json::Value& metricsData = outputPackageData["metrics"];
+            metricsData["totalSize"] = (Json::UInt64) totalSize;
             {
                 std::ofstream finalOutputFile((outputDir / "data.package").c_str());
                 finalOutputFile << outputPackageData;
