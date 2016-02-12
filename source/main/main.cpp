@@ -27,14 +27,16 @@ enum ObjectType {
     STRING,
     TEXTURE,
     GEOMETRY,
+    FONT,
 
     
     OTHER
 };
 
-// For debugging WIP converters
+// If this returns true, then all files of this type will be re-converted.
+// This is useful for debugging WIP converters.
 bool isWorkInProgressType(const ObjectType& type) {
-    return type == GEOMETRY;
+    return type == FONT;
 }
 
 void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
@@ -46,6 +48,10 @@ void translateData(const ObjectType& otype, const boost::filesystem::path& fromF
         }
         case GEOMETRY: {
             convertGeometry(fromFile, outputFile, params, modifyFilename);
+            break;
+        }
+        case FONT: {
+            convertFont(fromFile, outputFile, params, modifyFilename);
             break;
         }
         default: {
@@ -69,6 +75,7 @@ std::string typeToString(const ObjectType& tpe) {
         case STRING: return "string";
         case TEXTURE: return "texture";
         case GEOMETRY: return "geometry";
+        case FONT: return "font";
         default: return "other";
     }
 }
@@ -94,6 +101,8 @@ ObjectType stringToType(const std::string& str) {
         return TEXTURE;
     } else if(str == "geometry") {
         return GEOMETRY;
+    } else if(str == "font") {
+        return FONT;
     }
     return OTHER;
 }

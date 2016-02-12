@@ -8,6 +8,7 @@
     <File Name="Convert.hpp"/>
     <File Name="ConvertMiscellaneous.cpp"/>
     <File Name="ConvertGeometry.cpp"/>
+    <File Name="ConvertFont.cpp"/>
   </VirtualDirectory>
   <VirtualDirectory Name="lib">
     <VirtualDirectory Name="jsoncpp">
