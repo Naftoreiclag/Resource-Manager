@@ -8,10 +8,10 @@
         "color" : "color",
         "uv" : "texCoord"
     },
-    "uniforms" : {
-        "modelMat" : "uModel",
-        "viewMat" : "uView",
-        "projMat" : "uProj"
+    "matrices" : {
+        "model" : "uModel",
+        "view" : "uView",
+        "proj" : "uProj"
     },
     "controls" : {
         "sampler2D" : [

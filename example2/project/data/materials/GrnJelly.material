@@ -1,6 +1,6 @@
 {
     "shaderProgram" : "Hello.shaderProgram",
     "sampler2D" : {
-        "ambientTex" : "128Rose.texture"
+        "ambientTex" : "GrnJelly.texture"
     }
 }

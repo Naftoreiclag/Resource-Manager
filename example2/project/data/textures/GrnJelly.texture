@@ -1,7 +1,7 @@
 {
     "image" : "GreenJellyfish.image",
-    "minFilter" : "linear",
-    "magFilter" : "linear",
+    "minFilter" : "nearest",
+    "magFilter" : "nearest",
     "wrapX" : "clampToEdge",
     "wrapY" : "clampToEdge"
 }

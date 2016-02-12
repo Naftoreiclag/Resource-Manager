@@ -3,5 +3,10 @@
         "name" : "128Rose.material",
         "type" : "material",
         "file" : "128Rose.material"
+    },
+    {
+        "name" : "GrnJelly.material",
+        "type" : "material",
+        "file" : "GrnJelly.material"
     }
 ]

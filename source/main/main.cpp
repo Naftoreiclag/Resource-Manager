@@ -498,6 +498,7 @@ public:
             }
 
             uint64_t totalSize = 0;
+            uint32_t numUpdates = 0;
 
             Json::Value outputPackageData;
             Json::Value& objectListData = outputPackageData["resources"];
@@ -511,7 +512,7 @@ public:
 
                 if(!object.mSkipTranslate || isWorkInProgressType(object.mType)) {
                     translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !obfuscate);
-
+                    ++ numUpdates;
 
                     if(useIntermediate) {
                         Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];
@@ -551,6 +552,8 @@ public:
 
                 ++ jsonListIndex;
             }
+            std::cout << std::endl;
+            std::cout << numUpdates << " file(s) updated" << std::endl;
             std::cout << std::endl;
 
             if(useIntermediate) {
