@@ -4,10 +4,12 @@
   <Project Name="loader" Path="loader/loader.project" Active="No"/>
   <BuildMatrix>
     <WorkspaceConfiguration Name="Debug" Selected="no">
+      <Environment/>
       <Project Name="main" ConfigName="Debug"/>
       <Project Name="loader" ConfigName="Debug"/>
     </WorkspaceConfiguration>
     <WorkspaceConfiguration Name="Release" Selected="yes">
+      <Environment/>
       <Project Name="main" ConfigName="Release"/>
       <Project Name="loader" ConfigName="Release"/>
     </WorkspaceConfiguration>
