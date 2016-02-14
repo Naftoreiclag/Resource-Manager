@@ -15,4 +15,6 @@ void writeU8(std::ofstream& output, const uint8_t& value);
 
 void writeF32(std::ofstream& output, const float& value);
 
+void writeString(std::ofstream& output, const std::string& value);
+
 #endif // STREAMWRITE_HPP

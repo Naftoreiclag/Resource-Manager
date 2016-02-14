@@ -516,8 +516,7 @@ public:
             for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
                 Object& object = *iter;
 
-                std::cout << object.mName << std::endl;
-                std::cout << "\t" << typeToString(object.mType) << std::endl;
+                std::cout << object.mName << " [" << typeToString(object.mType) << "]" << std::endl;
 
                 if(!object.mSkipTranslate || isWorkInProgressType(object.mType)) {
                     translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !obfuscate);

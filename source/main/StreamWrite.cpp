@@ -22,3 +22,7 @@ void writeF32(std::ofstream& output, const float& value) {
     output.write((char*) &value, sizeof value);
 }
 
+void writeString(std::ofstream& output, const std::string& value) {
+    output << value;
+    writeU8(output, 0);
+}

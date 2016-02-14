@@ -1,5 +1,6 @@
 #include "Convert.hpp"
 
+#include <string>
 #include <fstream>
 #include <iostream>
 #include <stdint.h>
@@ -8,9 +9,13 @@
 
 #include "json/json.h"
 
+#include "StreamWrite.hpp"
+
 struct FontDesc {
     float baseline;
     float advances[256];
+
+    std::string image;
 };
 
 void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
@@ -97,12 +102,13 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
                 }
 
                 else {
-                    font.advances[index] = ((xEnd - xBegin) + 1) / glyphWidth;
+                    float advance = (xEnd - xBegin) + 1;
+                    font.advances[index] = advance / ((float) glyphWidth);
                 }
 
             }
 
-            std::cout << "\t" << ((char) index) << "\tAdv: " << font.advances[index] << std::endl;
+            //std::cout << "\t" << ((char) index) << "\tAdv: " << font.advances[index] << std::endl;
 
             ++ index;
         }
@@ -133,8 +139,20 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
     FontDesc font;
 
     font.baseline = metricsData["baseline"].asFloat();
+    font.image = renderingData["source"].asString();
 
     generateMetrics(font, fromFile.parent_path() / (metricsData["imageFile"].asString()));
 
-    boost::filesystem::copy_file(fromFile, outputFile);
+    {
+        std::ofstream outputData(outputFile.c_str(), std::ios::out | std::ios::binary);
+
+        writeString(outputData, font.image);
+        writeF32(outputData, font.baseline);
+        for(uint32_t i = 0; i < 256; ++ i) {
+            writeF32(outputData, font.advances[i]);
+            std::cout << font.advances[i] << std::endl;
+        }
+
+        outputData.close();
+    }
 }
