@@ -23,6 +23,7 @@ void writeF32(std::ofstream& output, const float& value) {
 }
 
 void writeString(std::ofstream& output, const std::string& value) {
-    writeU32(output, value.length());
-    output << value;
+    uint32_t length = value.length();
+    writeU32(output, length);
+    output.write(value.c_str(), length);
 }
