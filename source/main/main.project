@@ -9,6 +9,8 @@
     <File Name="ConvertMiscellaneous.cpp"/>
     <File Name="ConvertGeometry.cpp"/>
     <File Name="ConvertFont.cpp"/>
+    <File Name="StreamWrite.hpp"/>
+    <File Name="StreamWrite.cpp"/>
   </VirtualDirectory>
   <VirtualDirectory Name="lib">
     <VirtualDirectory Name="jsoncpp">
