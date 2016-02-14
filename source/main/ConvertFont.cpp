@@ -13,7 +13,8 @@
 
 struct FontDesc {
     float baseline;
-    float advances[256];
+    float glyphWidth[256];
+    float glyphStartX[256];
 
     std::string image;
 };
@@ -40,10 +41,10 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
         std::cout << "\tWarning: Metrics image height (" << height << ") not evenly divided by " << nRows << std::endl;
     }
 
-    uint32_t glyphWidth = width / nColumns;
-    uint32_t glyphHeight = height / nRows;
+    uint32_t cellWidth = width / nColumns;
+    uint32_t cellHeight = height / nRows;
 
-    if(glyphWidth == 0 || glyphHeight == 0) {
+    if(cellWidth == 0 || cellHeight == 0) {
         std::cout << "\tError: Invalid image area!" << std::endl;
         return;
     }
@@ -54,10 +55,10 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
 
             bool foundBegin = false;
             uint32_t xBegin = 0;
-            for(uint32_t x = 0; x < glyphWidth; ++ x) {
-                for(uint32_t y = 0; y < glyphHeight; ++ y) {
-                    uint32_t absX = (cx * glyphWidth) + x;
-                    uint32_t absY = (cy * glyphHeight) + y;
+            for(uint32_t x = 0; x < cellWidth; ++ x) {
+                for(uint32_t y = 0; y < cellHeight; ++ y) {
+                    uint32_t absX = (cx * cellWidth) + x;
+                    uint32_t absY = (cy * cellHeight) + y;
                     uint32_t absIndex = (absX + (absY * width)) * components;
 
                     if(image[absIndex] > 0) {
@@ -73,17 +74,18 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
 
             // There is no beginning, then the width of this glyph is zero.
             if(!foundBegin) {
-                font.advances[index] = 0.f;
+                font.glyphWidth[index] = 0.f;
+                font.glyphStartX[index] = 0.f;
             }
 
             // There is a beginning, so find the ending
             else {
                 bool foundEnd = false;
                 uint32_t xEnd = 0;
-                for(uint32_t x = glyphWidth - 1; x >= 0; -- x) {
-                    for(uint32_t y = 0; y < glyphHeight; ++ y) {
-                        uint32_t absX = (cx * glyphWidth) + x;
-                        uint32_t absY = (cy * glyphHeight) + y;
+                for(uint32_t x = cellWidth - 1; x >= 0; -- x) {
+                    for(uint32_t y = 0; y < cellHeight; ++ y) {
+                        uint32_t absX = (cx * cellWidth) + x;
+                        uint32_t absY = (cy * cellHeight) + y;
                         uint32_t absIndex = (absX + (absY * width)) * components;
 
                         if(image[absIndex] > 0) {
@@ -102,8 +104,11 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
                 }
 
                 else {
-                    float advance = (xEnd - xBegin) + 1;
-                    font.advances[index] = advance / ((float) glyphWidth);
+                    float diff = (xEnd - xBegin) + 1;
+                    float startX = xBegin;
+
+                    font.glyphWidth[index] = diff / ((float) cellWidth);
+                    font.glyphStartX[index] = startX / ((float) cellWidth);
                 }
 
             }
@@ -149,8 +154,8 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
         writeString(outputData, font.image);
         writeF32(outputData, font.baseline);
         for(uint32_t i = 0; i < 256; ++ i) {
-            writeF32(outputData, font.advances[i]);
-            std::cout << font.advances[i] << std::endl;
+            writeF32(outputData, font.glyphWidth[i]);
+            writeF32(outputData, font.glyphStartX[i]);
         }
 
         outputData.close();
