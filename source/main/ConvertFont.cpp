@@ -68,7 +68,7 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
 
             // There is no beginning, then the width of this glyph is zero.
             if(!foundBegin) {
-                font.advances[index] = 0;
+                font.advances[index] = 0.f;
             }
 
             // There is a beginning, so find the ending
@@ -97,7 +97,7 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
                 }
 
                 else {
-                    font.advances[index] = (xEnd - xBegin) + 1;
+                    font.advances[index] = ((xEnd - xBegin) + 1) / glyphWidth;
                 }
 
             }
