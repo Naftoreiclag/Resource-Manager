@@ -129,14 +129,14 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
         fileStream.close();
     }
 
-    Json::Value& metricsData = fontData["metrics"];
+    const Json::Value& metricsData = fontData["metrics"];
 
     if(metricsData.isNull()) {
         std::cout << "\tError: Font metrics specification absent!" << std::endl;
         return;
     }
 
-    Json::Value& renderingData = fontData["rendering"];
+    const Json::Value& renderingData = fontData["rendering"];
     if(renderingData.isNull()) {
         std::cout << "\tError: Font rendering specification absent!" << std::endl;
     }
@@ -147,6 +147,21 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
     font.texture = renderingData["texture"].asString();
 
     generateMetrics(font, fromFile.parent_path() / (metricsData["imageFile"].asString()));
+
+    // Load special cases
+    const Json::Value& manualData = metricsData["manual"];
+    if(!manualData.isNull())
+    {
+        for(Json::Value::const_iterator it = manualData.begin(); it != manualData.end(); ++ it) {
+            const Json::Value& glyphData = *it;
+
+            uint32_t gCode = glyphData["code"].asUInt();
+            float gWidth = glyphData["width"].asFloat();
+
+            font.glyphWidth[gCode] = gWidth;
+
+        }
+    }
 
     {
         std::ofstream outputData(outputFile.c_str(), std::ios::out | std::ios::binary);
