@@ -13,6 +13,7 @@
 
 struct FontDesc {
     float baseline;
+    float padding;
     float glyphWidth[256];
     float glyphStartX[256];
 
@@ -144,6 +145,7 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
     FontDesc font;
 
     font.baseline = metricsData["baseline"].asFloat();
+    font.padding = metricsData["padding"].asFloat();
     font.texture = renderingData["texture"].asString();
 
     generateMetrics(font, fromFile.parent_path() / (metricsData["imageFile"].asString()));
@@ -168,6 +170,7 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
 
         writeString(outputData, font.texture);
         writeF32(outputData, font.baseline);
+        writeF32(outputData, font.padding);
         for(uint32_t i = 0; i < 256; ++ i) {
             writeF32(outputData, font.glyphWidth[i]);
             writeF32(outputData, font.glyphStartX[i]);
