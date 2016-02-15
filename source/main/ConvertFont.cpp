@@ -16,7 +16,7 @@ struct FontDesc {
     float glyphWidth[256];
     float glyphStartX[256];
 
-    std::string image;
+    std::string texture;
 };
 
 void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
@@ -144,14 +144,14 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
     FontDesc font;
 
     font.baseline = metricsData["baseline"].asFloat();
-    font.image = renderingData["source"].asString();
+    font.texture = renderingData["texture"].asString();
 
     generateMetrics(font, fromFile.parent_path() / (metricsData["imageFile"].asString()));
 
     {
         std::ofstream outputData(outputFile.c_str(), std::ios::out | std::ios::binary);
 
-        writeString(outputData, font.image);
+        writeString(outputData, font.texture);
         writeF32(outputData, font.baseline);
         for(uint32_t i = 0; i < 256; ++ i) {
             writeF32(outputData, font.glyphWidth[i]);

@@ -519,6 +519,7 @@ public:
                 std::cout << object.mName << " [" << typeToString(object.mType) << "]" << std::endl;
 
                 if(!object.mSkipTranslate || isWorkInProgressType(object.mType)) {
+                    std::cout << "\tTranslating..." << std::endl;
                     translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !obfuscate);
                     ++ numUpdates;
 
