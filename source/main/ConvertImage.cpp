@@ -120,6 +120,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         bool first = true;
                         float shortestDistanceSq;
 
+                        // TODO: use spiraling instead. THIS IS WAY TOO SLOW!!!
                         for(int oy = 0; oy < height; ++ oy) {
                             for(int ox = 0; ox < width; ++ ox) {
                                 // If this pixel is of a different side
