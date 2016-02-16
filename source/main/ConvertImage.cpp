@@ -1,5 +1,6 @@
 #include "Convert.hpp"
 
+#include <cmath>
 #include <fstream>
 #include <iostream>
 
@@ -23,7 +24,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
     }
 
     bool writeAsDebug = false;
-    bool deleteFinalImage = false;
+    bool manuallyFreeImage = false;
 
     if(!params.isNull()) {
 
@@ -31,38 +32,172 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             writeAsDebug = params["debug"].asBool();
         }
 
-        const Json::Value& distanceField = params["distanceField"];
-        if(!distanceField.isNull()) {
-            bool absolute = true;
+        const Json::Value& distanceFieldData = params["distanceField"];
+        if(!distanceFieldData.isNull()) {
             int nWidth = width;
             int nHeight = height;
+
+            std::cout << "\tDistance field" << std::endl;
+
+            if(!distanceFieldData["width"].isNull()) {
+                if(distanceFieldData["width"].asFloat() < 1) {
+                    nWidth = ((float) width) * distanceFieldData["width"].asFloat();
+                } else {
+                    nWidth = distanceFieldData["width"].asInt();
+                }
+            }
+            if(!distanceFieldData["height"].isNull()) {
+                if(distanceFieldData["height"].asFloat() < 1) {
+                    nHeight = ((float) height) * distanceFieldData["height"].asFloat();
+                } else {
+                    nHeight = distanceFieldData["height"].asInt();
+                }
+            }
+
+            float insideSize = width;
+            float outsideSize = height;
+            if(!distanceFieldData["inside"].isNull()) {
+                if(distanceFieldData["inside"].asFloat() < 1) {
+                    // Use width, why not?
+                    insideSize = ((float) width) * distanceFieldData["inside"].asFloat();
+                } else {
+                    insideSize = distanceFieldData["inside"].asInt();
+                }
+            }
+            if(!distanceFieldData["outside"].isNull()) {
+                if(distanceFieldData["outside"].asFloat() < 1) {
+                    outsideSize = ((float) width) * distanceFieldData["outside"].asFloat();
+                } else {
+                    outsideSize = distanceFieldData["outside"].asInt();
+                }
+            }
+
+            float edgeValue = 0.5f;
+            if(!distanceFieldData["edgeValue"].isNull()) {
+                float romeo = distanceFieldData["edgeValue"].asFloat();
+                if(romeo > 0.f && romeo < 1.f) {
+                    edgeValue = romeo;
+                } else {
+                    std::cout << "\tWarning: Edge value must be in the range (0.0, 1.0). Setting to default (0.5)." << std::endl;
+                }
+            }
+
+            // Which channel to detect the edge on
+            // Example: 0 = red channel, 3 = alpha channel
+            uint32_t channel = 0;
+            if(!distanceFieldData["channel"].isNull()) {
+                channel = distanceFieldData["channel"].asUInt();
+
+                if(channel >= components) {
+                    std::cout << "\tWarning: Channel cannot be " << channel << std::endl;
+                    channel = 0;
+                }
+            }
+
+            if(nWidth < 1 || nHeight < 1) {
+                std::cout << "\tFailed to calculate distance field: illegal dimensions" << std::endl;
+            }
+            else {
+                std::cout << "\tResize to: " << nWidth << ", " << nHeight << std::endl;
+
+                uint32_t scaleX = width / nWidth;
+                uint32_t scaleY = height / nHeight;
+
+                // If for some reason future image files can only support >=3 channels, this is what needs to change
+                uint32_t nComponents = 1;
+
+                int size = nWidth * nHeight * nComponents;
+                unsigned char* newImageData = new unsigned char[size];
+
+                // For each of the new pixels
+                for(int y = 0; y < nHeight; ++ y) {
+                    for(int x = 0; x < nWidth; ++ x) {
+
+
+                        // Determine if this is inside or outside
+                        bool isInside = image[(x * scaleX + (y * scaleY * width)) * components + channel] > 0;
+
+                        bool first = true;
+                        float shortestDistanceSq;
+
+                        for(int oy = 0; oy < height; ++ oy) {
+                            for(int ox = 0; ox < width; ++ ox) {
+                                // If this pixel is of a different side
+                                if((image[(ox + (oy * width)) * components + channel] > 0) ^ isInside) {
+                                    float distanceSq = (((x * scaleX) - ox) * ((x * scaleX) - ox)) + (((y * scaleY) - oy) * ((y * scaleY) - oy));
+                                    if(first) {
+                                        shortestDistanceSq = distanceSq;
+                                        first = false;
+                                    }
+                                    else if(shortestDistanceSq > distanceSq) {
+                                        shortestDistanceSq = distanceSq;
+                                    }
+                                }
+                            }
+                        }
+
+                        if(first) {
+                            continue; // !? How is this even possible
+                        }
+
+                        float shortestDistance = std::sqrt(shortestDistanceSq);
+                        unsigned char newColor;
+
+                        if(isInside) {
+                            shortestDistance /= insideSize;
+                            if(shortestDistance > 1.0f) {
+                                newColor = 255;
+                            }
+                            else {
+                                newColor = 255.f * (edgeValue + (shortestDistance * (1.f - edgeValue)));
+                            }
+                        } else {
+                            shortestDistance /= outsideSize;
+                            if(shortestDistance > 1.0f) {
+                                newColor = 0;
+                            }
+                            else {
+                                newColor = 255.f * (edgeValue - (shortestDistance * (edgeValue)));
+                            }
+
+                        }
+
+                        for(unsigned int asdf = 0; asdf < nComponents; ++ asdf) {
+                            newImageData[((x + (y * nWidth)) * nComponents) + asdf] = newColor;
+                        }
+                    }
+                }
+
+                if(manuallyFreeImage) {
+                    delete[] image;
+                } else {
+                    stbi_image_free(image);
+                }
+                manuallyFreeImage = true;
+                width = nWidth;
+                height = nHeight;
+                image = newImageData;
+                components = nComponents;
+            }
         }
 
-        const Json::Value& resize = params["resize"];
-        if(!resize.isNull()) {
-            bool absolute = true;
+        const Json::Value& resizeData = params["resize"];
+        if(!resizeData.isNull()) {
             int nWidth = width;
             int nHeight = height;
 
-            if(!resize["absolute"].isNull()) {
-                absolute = resize["absolute"].asBool();
-            }
-
-            if(!resize["width"].isNull()) {
-                if(absolute) {
-                    nWidth = resize["width"].asInt();
-                }
-                else {
-                    nWidth = ((double) width) * resize["width"].asDouble();
+            if(!resizeData["width"].isNull()) {
+                if(resizeData["width"].asFloat() < 1) {
+                    nWidth = ((float) width) * resizeData["width"].asFloat();
+                } else {
+                    nWidth = resizeData["width"].asInt();
                 }
             }
-
-            if(!resize["height"].isNull()) {
-                if(absolute) {
-                    nHeight = resize["height"].asInt();
-                }
-                else {
-                    nHeight = ((double) height) * resize["height"].asDouble();
+            if(!resizeData["height"].isNull()) {
+                if(resizeData["height"].asFloat() < 1) {
+                    nHeight = ((float) height) * resizeData["height"].asFloat();
+                } else {
+                    nHeight = resizeData["height"].asInt();
                 }
             }
 
@@ -77,12 +212,12 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 unsigned char* tempImageData = new unsigned char[size];
 
                 stbir_resize_uint8(image, width, height, 0, tempImageData, nWidth, nHeight, 0, components);
-                if(deleteFinalImage) {
+                if(manuallyFreeImage) {
                     delete[] image;
                 } else {
                     stbi_image_free(image);
                 }
-                deleteFinalImage = true;
+                manuallyFreeImage = true;
                 width = nWidth;
                 height = nHeight;
                 image = new unsigned char[size];
@@ -126,12 +261,12 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         }
                     }
 
-                    if(deleteFinalImage) {
+                    if(manuallyFreeImage) {
                         delete[] image;
                     } else {
                         stbi_image_free(image);
                     }
-                    deleteFinalImage = true;
+                    manuallyFreeImage = true;
                     image = newImageData;
                     components = 3;
                 }
@@ -148,12 +283,12 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         }
                     }
 
-                    if(deleteFinalImage) {
+                    if(manuallyFreeImage) {
                         delete[] image;
                     } else {
                         stbi_image_free(image);
                     }
-                    deleteFinalImage = true;
+                    manuallyFreeImage = true;
                     image = newImageData;
                     components = 3;
                 }
@@ -176,12 +311,12 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         }
                     }
 
-                    if(deleteFinalImage) {
+                    if(manuallyFreeImage) {
                         delete[] image;
                     } else {
                         stbi_image_free(image);
                     }
-                    deleteFinalImage = true;
+                    manuallyFreeImage = true;
                     image = newImageData;
                     components = 3;
                 }
@@ -198,12 +333,12 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         }
                     }
 
-                    if(deleteFinalImage) {
+                    if(manuallyFreeImage) {
                         delete[] image;
                     } else {
                         stbi_image_free(image);
                     }
-                    deleteFinalImage = true;
+                    manuallyFreeImage = true;
                     image = newImageData;
                     components = 3;
                 }
@@ -366,12 +501,12 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         }
                     }
 
-                    if(deleteFinalImage) {
+                    if(manuallyFreeImage) {
                         delete[] image;
                     } else {
                         stbi_image_free(image);
                     }
-                    deleteFinalImage = true;
+                    manuallyFreeImage = true;
                     image = newImageData;
                     components = 3;
                 }
@@ -412,7 +547,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
     outputData.close();
 
-    if(deleteFinalImage) {
+    if(manuallyFreeImage) {
         delete[] image;
     }
     else {
