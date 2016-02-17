@@ -506,7 +506,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                         int scanX = (index == 0 || index == 3) ? (x - expand) : (x + expand);
                                         int scanY = (index == 0 || index == 1) ? (y - expand) : (y + expand);
 
-                                        for(int step = 0; step <= expand; ++ step) {
+                                        for(int step = 0; step <= expand * 2; ++ step) {
                                             if(step > 0) {
                                                 if(index == 0) {
                                                     ++ scanX;
