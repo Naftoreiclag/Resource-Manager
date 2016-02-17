@@ -176,10 +176,8 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                             shortestDistanceSq = distanceSq;
 
                                             // Slight optimization: reduce maximum scanning distance
-                                            /*
                                             float nMaxDist = std::ceil(std::sqrt(shortestDistanceSq));
                                             if(nMaxDist < maxDist) { maxDist = nMaxDist; }
-                                            */
 
                                             // Remember that the first pixel was already located
                                             pixelFound = true;
@@ -191,10 +189,8 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                             shortestDistanceSq = distanceSq;
 
                                             // Slight optimization: reduce maximum scanning distance
-                                            /*
                                             float nMaxDist = std::ceil(std::sqrt(shortestDistanceSq));
                                             if(nMaxDist < maxDist) { maxDist = nMaxDist; }
-                                            */
 
                                         }
                                     }
