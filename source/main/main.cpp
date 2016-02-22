@@ -554,7 +554,7 @@ public:
                 Json::Value& objectDef = objectListData[jsonListIndex];
                 objectDef["name"] = object.mName;
                 objectDef["type"] = typeToString(object.mType);
-                objectDef["file"] = object.mOutputFile.filename().c_str();
+                objectDef["file"] = object.mOutputFile.filename().string().c_str();
                 objectDef["size"] = object.mOutputSize;
 
                 totalSize += object.mOutputSize;
@@ -601,6 +601,8 @@ int main(int argc, char* argv[]) {
         "\nUsage: MACBETH source"
         "\n"
         ;
+        
+        // ../../../example2/project/core.project
         
         return 0;
     }
