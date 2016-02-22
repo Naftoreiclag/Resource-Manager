@@ -18,4 +18,5 @@ example2/output/*
 example2/intermediate/*
 
 libraries/*
+dependencies-win/*
 /example2/project/data/geometry/Cube.blend1

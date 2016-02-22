@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CodeLite_Workspace Name="resman" Database="resman.tags">
   <Project Name="main" Path="main/main.project" Active="Yes"/>
-  <Project Name="loader" Path="loader/loader.project" Active="No"/>
   <BuildMatrix>
     <WorkspaceConfiguration Name="Debug" Selected="no">
-      <Environment/>
       <Project Name="main" ConfigName="Debug"/>
-      <Project Name="loader" ConfigName="Debug"/>
     </WorkspaceConfiguration>
     <WorkspaceConfiguration Name="Release" Selected="yes">
-      <Environment/>
       <Project Name="main" ConfigName="Release"/>
-      <Project Name="loader" ConfigName="Release"/>
+    </WorkspaceConfiguration>
+    <WorkspaceConfiguration Name="WinDebug" Selected="no">
+      <Project Name="main" ConfigName="WinDebug"/>
+    </WorkspaceConfiguration>
+    <WorkspaceConfiguration Name="WinRelease" Selected="no">
+      <Project Name="main" ConfigName="WinRelease"/>
     </WorkspaceConfiguration>
   </BuildMatrix>
 </CodeLite_Workspace>

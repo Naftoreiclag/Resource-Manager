@@ -16,7 +16,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
     int width;
     int height;
     int components;
-    unsigned char* image = stbi_load(fromFile.c_str(), &width, &height, &components, 0);
+    unsigned char* image = stbi_load(fromFile.string().c_str(), &width, &height, &components, 0);
 
     if(!image) {
         std::cout << "\tFailed to read image!" << std::endl;
@@ -624,7 +624,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
     //if(writeAsDebug) {
     if(true) {
-        int result = stbi_write_png(outputFile.c_str(), width, height, components, image, 0);
+        int result = stbi_write_png(outputFile.string().c_str(), width, height, components, image, 0);
 
         if(result > 0) {
             return;
@@ -634,7 +634,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
         }
     }
 
-    std::ofstream outputData(outputFile.c_str(), std::ios::out | std::ios::binary);
+    std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
 
     outputData << width;
     outputData << height;

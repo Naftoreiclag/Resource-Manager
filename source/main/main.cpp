@@ -59,7 +59,7 @@ void translateData(const ObjectType& otype, const boost::filesystem::path& fromF
             break;
         }
     }
-    std::ifstream sizeTest(outputFile.c_str(), std::ios::binary | std::ios::ate);
+    std::ifstream sizeTest(outputFile.string().c_str(), std::ios::binary | std::ios::ate);
     filesize = sizeTest.tellg();
 }
 
@@ -205,7 +205,7 @@ public:
         
         {
             Json::Value projectData;
-            std::ifstream fileStream(mFile.c_str());
+            std::ifstream fileStream(mFile.string().c_str());
             fileStream >> projectData;
             fileStream.close();
             
@@ -225,7 +225,7 @@ public:
         bool useIntermediate = false;
         if(boost::filesystem::exists(configFile)) {
             Json::Value configData;
-            std::ifstream fileStream(configFile.c_str());
+            std::ifstream fileStream(configFile.string().c_str());
             fileStream >> configData;
             fileStream.close();
             
@@ -310,7 +310,7 @@ public:
         for(std::vector<boost::filesystem::path>::iterator objectFileIter = objectFiles.begin(); objectFileIter != objectFiles.end(); ++ objectFileIter) {
             boost::filesystem::path& objectFile = *objectFileIter;
             Json::Value objectData;
-            std::ifstream fileStream(objectFile.c_str());
+            std::ifstream fileStream(objectFile.string().c_str());
             fileStream >> objectData;
             fileStream.close();
             
@@ -421,7 +421,7 @@ public:
 
                 Object& object = *iter;
 
-                std::ifstream reader(object.mFile.c_str(), std::ios::binary | std::ios::ate);
+                std::ifstream reader(object.mFile.string().c_str(), std::ios::binary | std::ios::ate);
                 object.mOriginalSize = reader.tellg();
 
                 char* totalData = new char[object.mOriginalSize];
@@ -447,7 +447,7 @@ public:
             else {
                 Json::Value previousCompilation;
                 {
-                    std::ifstream reader(intermediateFile.c_str());
+                    std::ifstream reader(intermediateFile.string().c_str());
                     reader >> previousCompilation;
                     reader.close();
                 }
@@ -480,7 +480,7 @@ public:
                             object.mSkipTranslate = true;
 
                             boost::filesystem::copy(intermediateDir / (metadata["file"].asString()), object.mOutputFile);
-                            std::ifstream sizeTest(object.mOutputFile.c_str(), std::ios::binary | std::ios::ate);
+                            std::ifstream sizeTest(object.mOutputFile.string().c_str(), std::ios::binary | std::ios::ate);
                             object.mOutputSize = sizeTest.tellg();
 
                             break;
@@ -499,7 +499,7 @@ public:
             uint32_t metadataIndex = 0;
             if(useIntermediate) {
                 if(boost::filesystem::exists(intermediateFile)) {
-                    std::ifstream reader(intermediateFile.c_str());
+                    std::ifstream reader(intermediateFile.string().c_str());
                     reader >> intermediateData;
                     reader.close();
                     metadataIndex = intermediateData["metadata"].size();
@@ -568,7 +568,7 @@ public:
             if(useIntermediate) {
                 std::cout << "Exporting intermediate.data... ";
                 {
-                    std::ofstream intermOutput(intermediateFile.c_str());
+                    std::ofstream intermOutput(intermediateFile.string().c_str());
                     intermOutput << intermediateData;
                     intermOutput.close();
                 }
@@ -581,7 +581,7 @@ public:
             Json::Value& metricsData = outputPackageData["metrics"];
             metricsData["totalSize"] = (Json::UInt64) totalSize;
             {
-                std::ofstream finalOutputFile((outputDir / "data.package").c_str());
+                std::ofstream finalOutputFile((outputDir / "data.package").string().c_str());
                 finalOutputFile << outputPackageData;
                 finalOutputFile.close();
             }

@@ -24,7 +24,7 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
     int width;
     int height;
     int components;
-    unsigned char* image = stbi_load(imgFile.c_str(), &width, &height, &components, 0);
+    unsigned char* image = stbi_load(imgFile.string().c_str(), &width, &height, &components, 0);
 
     if(!image) {
         std::cout << "\tError: Failed to read metrics image file!" << std::endl;
@@ -125,7 +125,7 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
 
     Json::Value fontData;
     {
-        std::ifstream fileStream(fromFile.c_str());
+        std::ifstream fileStream(fromFile.string().c_str());
         fileStream >> fontData;
         fileStream.close();
     }
@@ -166,7 +166,7 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
     }
 
     {
-        std::ofstream outputData(outputFile.c_str(), std::ios::out | std::ios::binary);
+        std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
 
         writeString(outputData, font.texture);
         writeF32(outputData, font.baseline);

@@ -108,7 +108,7 @@ struct Mesh {
 
 void convertGeometry(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
     Assimp::Importer assimp;
-    const aiScene* scene = assimp.ReadFile(fromFile.c_str(), aiProcess_Triangulate);
+    const aiScene* scene = assimp.ReadFile(fromFile.string().c_str(), aiProcess_Triangulate);
     // aiProcessPreset_TargetRealtime_Fast also triangulates
 
     // TODO: support for multiple color and uv channels
@@ -189,7 +189,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     std::cout << "\tTriangles: " << mesh.triangles.size() << std::endl;
 
     {
-        std::ofstream outputData(outputFile.c_str(), std::ios::out | std::ios::binary);
+        std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
 
         writeBool(outputData, mesh.usePositions);
         writeBool(outputData, mesh.useColor);
