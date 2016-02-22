@@ -405,7 +405,11 @@ public:
                     outputObjectFile /= ss.str();
                 }
                 else {
-                    outputObjectFile /= object.mFile.filename();
+                    std::stringstream ss;
+                    ss << object.mFile.stem().string();
+                    ss << (seqName ++);
+                    ss << object.mFile.extension().string();
+                    outputObjectFile /= ss.str();
                 }
 
                 object.mOutputFile = outputObjectFile;
