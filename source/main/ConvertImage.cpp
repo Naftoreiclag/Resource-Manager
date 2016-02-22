@@ -113,6 +113,8 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 uint32_t scaleX = width / nWidth;
                 uint32_t scaleY = height / nHeight;
 
+                std::cout << "\tBeginning distance field calculation. This may take awhile..." << std::endl;
+
                 // For each of the new pixels
                 for(int y = 0; y < nHeight; ++ y) {
                     for(int x = 0; x < nWidth; ++ x) {
