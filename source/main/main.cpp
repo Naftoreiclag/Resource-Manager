@@ -406,9 +406,9 @@ public:
                 }
                 else {
                     std::stringstream ss;
-                    ss << object.mFile.stem().string();
                     ss << (seqName ++);
-                    ss << object.mFile.extension().string();
+                    ss << "_";
+                    ss << object.mFile.filename().string();
                     outputObjectFile /= ss.str();
                 }
 
