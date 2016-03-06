@@ -19,7 +19,13 @@ void debugAiNode(const aiScene* scene, const aiNode* node, unsigned int depth) {
 
     std::cout << node->mName.C_Str();
 
+    // Matrix
+    if(!node->mTransformation.IsIdentity()) {
+        std::cout << " (transformed)";
+    }
+    
     unsigned int numMeshes = node->mNumMeshes;
+
 
     if(numMeshes > 0) {
         std::cout << " ";
@@ -31,6 +37,7 @@ void debugAiNode(const aiScene* scene, const aiNode* node, unsigned int depth) {
 
             std::cout << mesh->mName.C_Str();
 
+            // Nice commas
             if(i != numMeshes - 1) {
                 std::cout << ", ";
             }
@@ -45,6 +52,21 @@ void debugAiNode(const aiScene* scene, const aiNode* node, unsigned int depth) {
     for(unsigned int i = 0; i < numChildren; ++ i) {
         debugAiNode(scene, node->mChildren[i], depth + 1);
     }
+}
+
+const aiNode* findFirstMeshNode(const aiNode* node) {
+    if(node->mNumMeshes > 0) {
+        return node;
+    }
+    
+    for(unsigned int i = 0; i < node->mNumChildren; ++ i) {
+        const aiNode* search = findFirstMeshNode(node->mChildren[i]);
+        if(search) {
+            return search;
+        }
+    }
+    
+    return 0;
 }
 
 namespace geo {
@@ -105,6 +127,17 @@ struct Mesh {
 };
 
 }
+float floatsy(float val) {
+    return val < 0.00005f ? 0.f : val;
+}
+
+void printThis(const aiMatrix4x4& aoffsetMatrix) {
+
+    std::cout << floatsy(aoffsetMatrix.a1) << "\t| " << floatsy(aoffsetMatrix.a2) << "\t| " << floatsy(aoffsetMatrix.a3) << "\t| " << floatsy(aoffsetMatrix.a4) << "\t| " << std::endl;
+    std::cout << floatsy(aoffsetMatrix.b1) << "\t| " << floatsy(aoffsetMatrix.b2) << "\t| " << floatsy(aoffsetMatrix.b3) << "\t| " << floatsy(aoffsetMatrix.b4) << "\t| " << std::endl;
+    std::cout << floatsy(aoffsetMatrix.c1) << "\t| " << floatsy(aoffsetMatrix.c2) << "\t| " << floatsy(aoffsetMatrix.c3) << "\t| " << floatsy(aoffsetMatrix.c4) << "\t| " << std::endl;
+    std::cout << floatsy(aoffsetMatrix.d1) << "\t| " << floatsy(aoffsetMatrix.d2) << "\t| " << floatsy(aoffsetMatrix.d3) << "\t| " << floatsy(aoffsetMatrix.d4) << "\t| " << std::endl;
+}
 
 void convertGeometry(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
     Assimp::Importer assimp;
@@ -118,8 +151,10 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     debugAiNode(scene, rootNode, 1);
 
     geo::Mesh mesh;
+    
+    const aiNode* aNode = findFirstMeshNode(rootNode);
 
-    const aiMesh* aMesh = scene->mMeshes[0];
+    const aiMesh* aMesh = scene->mMeshes[aNode->mMeshes[0]];
 
     mesh.useNormals = aMesh->HasNormals();
     mesh.usePositions = aMesh->HasPositions();
@@ -146,7 +181,8 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         geo::Vertex vertex;
 
         if(mesh.usePositions) {
-            const aiVector3D& aPos = aMesh->mVertices[i];
+            aiVector3D aPos = aMesh->mVertices[i];
+            aPos *= aNode->mTransformation;
             vertex.x = aPos.x;
             vertex.y = aPos.y;
             vertex.z = aPos.z;
@@ -159,7 +195,16 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             vertex.a = aColor.a;
         }
         if(mesh.useNormals) {
-            const aiVector3D& aNormal = aMesh->mNormals[i];
+            aiVector3D aNormal = aMesh->mNormals[i];
+            aiMatrix4x4 transf = aNode->mTransformation;
+            
+            // Simulating w = 0 (aNormal is a direction not a position)
+            transf.a4 = 0.f;
+            transf.b4 = 0.f;
+            transf.c4 = 0.f;
+            transf.d4 = 0.f;
+            
+            aNormal *= transf;
             vertex.nx = aNormal.x;
             vertex.ny = aNormal.y;
             vertex.nz = aNormal.z;
