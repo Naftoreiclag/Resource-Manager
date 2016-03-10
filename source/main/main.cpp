@@ -36,7 +36,7 @@ enum ObjectType {
 // If this returns true, then all files of this type will be re-converted.
 // This is useful for debugging WIP converters.
 bool isWorkInProgressType(const ObjectType& type) {
-    return type == FONT;
+    return type == GEOMETRY;
 }
 
 void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
@@ -142,7 +142,7 @@ public:
         object.mDebugOrigin = objectFile;
         object.mName = objectData["name"].asString();
         object.mType = stringToType(objectData["type"].asString());
-        object.mParams = objectData["params"];
+        object.mParams = objectData["parameters"];
         if(object.mType == OTHER) {
             std::cout << "Warning! Unknown resource type " << objectData["type"].asString() << " found in resource " << object.mName << " found at " << object.mDebugOrigin << std::endl;
         }
