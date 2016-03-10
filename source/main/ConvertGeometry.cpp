@@ -91,6 +91,14 @@ struct Vertex {
     float nx;
     float ny;
     float nz;
+    
+    // Tangent/Bitangent
+    float tx;
+    float ty;
+    float tz;
+    float btx;
+    float bty;
+    float btz;
 
     Vertex()
     : x(0.f)
@@ -124,6 +132,7 @@ struct Mesh {
     bool useUV;
     bool useNormals;
     bool usePositions;
+    bool useTangents;
 };
 
 }
@@ -140,9 +149,27 @@ void printThis(const aiMatrix4x4& aoffsetMatrix) {
 }
 
 void convertGeometry(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
+    
+    
+    
     Assimp::Importer assimp;
-    const aiScene* scene = assimp.ReadFile(fromFile.string().c_str(), aiProcess_Triangulate);
-    // aiProcessPreset_TargetRealtime_Fast also triangulates
+    const aiScene* scene;
+    {
+        unsigned int importFlags = aiProcess_Triangulate;
+        
+        const Json::Value& tangentsData = params["tangents"];
+        
+        if(!tangentsData.isNull()) {
+            bool generate = tangentsData["generate"].asBool();
+            
+            if(generate) {
+                importFlags |= aiProcess_CalcTangentSpace;
+                std::cout << "\tTangents: generate" << std::endl;
+            }
+        }
+        
+        scene = assimp.ReadFile(fromFile.string().c_str(), importFlags);
+    }
 
     // TODO: support for multiple color and uv channels
 
@@ -158,6 +185,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
 
     mesh.useNormals = aMesh->HasNormals();
     mesh.usePositions = aMesh->HasPositions();
+    mesh.useTangents = aMesh->HasTangentsAndBitangents();
     mesh.useColor = false;
     for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
         if(aMesh->HasVertexColors(i)) {
@@ -214,6 +242,17 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             vertex.u = aUV.x;
             vertex.v = aUV.y;
         }
+        if(mesh.useTangents) {
+            const aiVector3D& aTangent = aMesh->mTangents[i];
+            vertex.tx = aTangent.x;
+            vertex.ty = aTangent.y;
+            vertex.tz = aTangent.z;
+            
+            const aiVector3D& aBitangent = aMesh->mBitangents[i];
+            vertex.btx = aBitangent.x;
+            vertex.bty = aBitangent.y;
+            vertex.btz = aBitangent.z;
+        }
 
         mesh.vertices.push_back(vertex);
     }
@@ -240,6 +279,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         writeBool(outputData, mesh.useColor);
         writeBool(outputData, mesh.useUV);
         writeBool(outputData, mesh.useNormals);
+        writeBool(outputData, mesh.useTangents);
         writeU32(outputData, mesh.vertices.size());
         writeU32(outputData, mesh.triangles.size());
         for(geo::VertexBuffer::iterator iter = mesh.vertices.begin(); iter != mesh.vertices.end(); ++ iter) {
@@ -264,6 +304,14 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
                 writeF32(outputData, vertex.nx);
                 writeF32(outputData, vertex.ny);
                 writeF32(outputData, vertex.nz);
+            }
+            if(mesh.useTangents) {
+                writeF32(outputData, vertex.tx);
+                writeF32(outputData, vertex.ty);
+                writeF32(outputData, vertex.tz);
+                writeF32(outputData, vertex.btx);
+                writeF32(outputData, vertex.bty);
+                writeF32(outputData, vertex.btz);
             }
         }
         for(geo::TriangleBuffer::iterator iter = mesh.triangles.begin(); iter != mesh.triangles.end(); ++ iter) {
