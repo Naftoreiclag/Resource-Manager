@@ -92,10 +92,12 @@ struct Vertex {
     float ny;
     float nz;
     
-    // Tangent/Bitangent
+    // Tangent
     float tx;
     float ty;
     float tz;
+    
+    // Bitangent
     float btx;
     float bty;
     float btz;
@@ -133,6 +135,7 @@ struct Mesh {
     bool useNormals;
     bool usePositions;
     bool useTangents;
+    bool useBitangents;
 };
 
 }
@@ -186,6 +189,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     mesh.useNormals = aMesh->HasNormals();
     mesh.usePositions = aMesh->HasPositions();
     mesh.useTangents = aMesh->HasTangentsAndBitangents();
+    mesh.useBitangents = aMesh->HasTangentsAndBitangents();
     mesh.useColor = false;
     for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
         if(aMesh->HasVertexColors(i)) {
@@ -247,7 +251,8 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             vertex.tx = aTangent.x;
             vertex.ty = aTangent.y;
             vertex.tz = aTangent.z;
-            
+        }
+        if(mesh.useBitangents) {
             const aiVector3D& aBitangent = aMesh->mBitangents[i];
             vertex.btx = aBitangent.x;
             vertex.bty = aBitangent.y;
@@ -280,6 +285,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         writeBool(outputData, mesh.useUV);
         writeBool(outputData, mesh.useNormals);
         writeBool(outputData, mesh.useTangents);
+        writeBool(outputData, mesh.useBitangents);
         writeU32(outputData, mesh.vertices.size());
         writeU32(outputData, mesh.triangles.size());
         for(geo::VertexBuffer::iterator iter = mesh.vertices.begin(); iter != mesh.vertices.end(); ++ iter) {
@@ -309,6 +315,8 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
                 writeF32(outputData, vertex.tx);
                 writeF32(outputData, vertex.ty);
                 writeF32(outputData, vertex.tz);
+            }
+            if(mesh.useBitangents) {
                 writeF32(outputData, vertex.btx);
                 writeF32(outputData, vertex.bty);
                 writeF32(outputData, vertex.btz);
