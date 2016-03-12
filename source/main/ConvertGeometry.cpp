@@ -160,8 +160,17 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     {
         unsigned int importFlags = aiProcess_Triangulate;
         
-        const Json::Value& tangentsData = params["tangents"];
+        const Json::Value& uvsData = params["uvs"];
+        if(!uvsData.isNull()) {
+            bool flip = uvsData["flip"].asBool();
+            
+            if(flip) {
+                importFlags |= aiProcess_FlipUVs;
+                std::cout << "\tUVs: flip" << std::endl;
+            }
+        }
         
+        const Json::Value& tangentsData = params["tangents"];
         if(!tangentsData.isNull()) {
             bool generate = tangentsData["generate"].asBool();
             
@@ -174,6 +183,8 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         scene = assimp.ReadFile(fromFile.string().c_str(), importFlags);
     }
 
+
+    // TODO: Use aiProcess_PreTransformVertices instead of manually transforming?
     // TODO: support for multiple color and uv channels
 
     const aiNode* rootNode = scene->mRootNode;
@@ -247,13 +258,31 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             vertex.v = aUV.y;
         }
         if(mesh.useTangents) {
-            const aiVector3D& aTangent = aMesh->mTangents[i];
+            aiVector3D aTangent = aMesh->mTangents[i];
+            aiMatrix4x4 transf = aNode->mTransformation;
+            
+            // Simulating w = 0
+            transf.a4 = 0.f;
+            transf.b4 = 0.f;
+            transf.c4 = 0.f;
+            transf.d4 = 0.f;
+            
+            aTangent *= transf;
             vertex.tx = aTangent.x;
             vertex.ty = aTangent.y;
             vertex.tz = aTangent.z;
         }
         if(mesh.useBitangents) {
-            const aiVector3D& aBitangent = aMesh->mBitangents[i];
+            aiVector3D aBitangent = aMesh->mBitangents[i];
+            aiMatrix4x4 transf = aNode->mTransformation;
+            
+            // Simulating w = 0
+            transf.a4 = 0.f;
+            transf.b4 = 0.f;
+            transf.c4 = 0.f;
+            transf.d4 = 0.f;
+            
+            aBitangent *= transf;
             vertex.btx = aBitangent.x;
             vertex.bty = aBitangent.y;
             vertex.btz = aBitangent.z;
