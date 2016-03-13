@@ -160,6 +160,14 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     {
         unsigned int importFlags = aiProcess_Triangulate;
         
+        const Json::Value& pretransformData = params["pretransform"];
+        if(!pretransformData.isNull()) {
+            if(pretransformData.asBool()) {
+                importFlags |= aiProcess_PreTransformVertices;
+                std::cout << "\tPretransform: true" << std::endl;
+            }
+        }
+        
         const Json::Value& uvsData = params["uvs"];
         if(!uvsData.isNull()) {
             bool flip = uvsData["flip"].asBool();
@@ -184,7 +192,6 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     }
 
 
-    // TODO: Use aiProcess_PreTransformVertices instead of manually transforming?
     // TODO: support for multiple color and uv channels
 
     const aiNode* rootNode = scene->mRootNode;
@@ -225,7 +232,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
 
         if(mesh.usePositions) {
             aiVector3D aPos = aMesh->mVertices[i];
-            aPos *= aNode->mTransformation;
+            //aPos *= aNode->mTransformation;
             vertex.x = aPos.x;
             vertex.y = aPos.y;
             vertex.z = aPos.z;
@@ -247,7 +254,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             transf.c4 = 0.f;
             transf.d4 = 0.f;
             
-            aNormal *= transf;
+            //aNormal *= transf;
             vertex.nx = aNormal.x;
             vertex.ny = aNormal.y;
             vertex.nz = aNormal.z;
@@ -267,7 +274,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             transf.c4 = 0.f;
             transf.d4 = 0.f;
             
-            aTangent *= transf;
+            //aTangent *= transf;
             vertex.tx = aTangent.x;
             vertex.ty = aTangent.y;
             vertex.tz = aTangent.z;
@@ -282,7 +289,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             transf.c4 = 0.f;
             transf.d4 = 0.f;
             
-            aBitangent *= transf;
+            //aBitangent *= transf;
             vertex.btx = aBitangent.x;
             vertex.bty = aBitangent.y;
             vertex.btz = aBitangent.z;
