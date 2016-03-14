@@ -330,6 +330,35 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 for(int i = 0; i < size; ++ i) {
                     image[i] = tempImageData[i];
                 }
+                
+                // TODO: check if tempImageData needs special deletion
+            }
+        }
+
+        const Json::Value& componentsData = params["limitComponents"];
+        if(!componentsData.isNull()) {
+            uint32_t nComponents = componentsData.asInt();
+            
+            if(nComponents < components && nComponents > 0) {
+                
+                unsigned char* nImage = new unsigned char[width * height * nComponents];
+                
+                for(uint32_t y = 0; y < height; ++ y) {
+                    for(uint32_t x = 0; x < width; ++ x) {
+                        for(uint32_t c = 0; c < nComponents; ++ c) {
+                            nImage[((y * width) + x) * nComponents + c] = image[((y * width) + x) * components + c];
+                        }
+                    }
+                }
+                
+                if(manuallyFreeImage) {
+                    delete[] image;
+                } else {
+                    stbi_image_free(image);
+                }
+                manuallyFreeImage = true;
+                components = nComponents;
+                image = nImage;
             }
         }
 
