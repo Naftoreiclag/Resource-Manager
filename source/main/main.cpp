@@ -21,8 +21,10 @@ enum ObjectType {
     MATERIAL,
     MODEL,
     VERTEX_SHADER,
-    FRAGMENT_SHADER,
+    TESS_CONTROL_SHADER,
+    TESS_EVALUATION_SHADER,
     GEOMETRY_SHADER,
+    FRAGMENT_SHADER,
     SHADER_PROGRAM,
     STRING,
     TEXTURE,
@@ -69,8 +71,10 @@ std::string typeToString(const ObjectType& tpe) {
         case MATERIAL: return "material";
         case MODEL: return "model";
         case VERTEX_SHADER: return "vertex-shader";
-        case FRAGMENT_SHADER: return "fragment-shader";
+        case TESS_CONTROL_SHADER: return "tess-control-shader";
+        case TESS_EVALUATION_SHADER: return "tess-evaluation-shader";
         case GEOMETRY_SHADER: return "geometry-shader";
+        case FRAGMENT_SHADER: return "fragment-shader";
         case SHADER_PROGRAM: return "shader-program";
         case STRING: return "string";
         case TEXTURE: return "texture";
@@ -89,10 +93,14 @@ ObjectType stringToType(const std::string& str) {
         return MODEL;
     } else if(str == "vertex-shader") {
         return VERTEX_SHADER;
-    } else if(str == "fragment-shader") {
-        return FRAGMENT_SHADER;
+    } else if(str == "tess-control-shader") {
+        return TESS_CONTROL_SHADER;
+    } else if(str == "tess-evaluation-shader") {
+        return TESS_EVALUATION_SHADER;
     } else if(str == "geometry-shader") {
         return GEOMETRY_SHADER;
+    } else if(str == "fragment-shader") {
+        return FRAGMENT_SHADER;
     } else if(str == "shader-program") {
         return SHADER_PROGRAM;
     } else if(str == "string") {
