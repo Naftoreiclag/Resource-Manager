@@ -20,6 +20,7 @@ enum ObjectType {
     IMAGE,
     MATERIAL,
     MODEL,
+    COMPUTE_SHADER,
     VERTEX_SHADER,
     TESS_CONTROL_SHADER,
     TESS_EVALUATION_SHADER,
@@ -70,6 +71,7 @@ std::string typeToString(const ObjectType& tpe) {
         case IMAGE: return "image";
         case MATERIAL: return "material";
         case MODEL: return "model";
+        case COMPUTE_SHADER: return "compute-shader";
         case VERTEX_SHADER: return "vertex-shader";
         case TESS_CONTROL_SHADER: return "tess-control-shader";
         case TESS_EVALUATION_SHADER: return "tess-evaluation-shader";
@@ -91,6 +93,8 @@ ObjectType stringToType(const std::string& str) {
         return MATERIAL;
     } else if(str == "model") {
         return MODEL;
+    } else if(str == "compute-shader") {
+        return COMPUTE_SHADER;
     } else if(str == "vertex-shader") {
         return VERTEX_SHADER;
     } else if(str == "tess-control-shader") {
