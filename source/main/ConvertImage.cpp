@@ -72,10 +72,11 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 }
             }
 
+            // This is the luminance of the pixels located on the edge of the original image
             float edgeValue = 0.5f;
             if(!distanceFieldData["edgeValue"].isNull()) {
                 float romeo = distanceFieldData["edgeValue"].asFloat();
-                if(romeo > 0.f && romeo < 1.f) {
+                if(romeo >= 0.f && romeo <= 1.f) {
                     edgeValue = romeo;
                 } else {
                     std::cout << "\tWarning: Edge value must be in the range (0.0, 1.0). Setting to default (0.5)." << std::endl;
@@ -246,7 +247,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                             }
                         }
 
-                        // This is actually possible
+                        // This is actually possible, since the the inside/ouside size can be zero
                         else {
                             intensity = isInside ? 1.f : 0.f;
                         }
