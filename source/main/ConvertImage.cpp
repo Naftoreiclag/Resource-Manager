@@ -31,6 +31,191 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
         if(!params["debug"].isNull()) {
             writeAsDebug = params["debug"].asBool();
         }
+        
+        const Json::Value& vectorFieldData = params["ssipgField"];
+        if(!vectorFieldData.isNull()) {
+            int nWidth = width;
+            int nHeight = height;
+
+            std::cout << "\tSSIPG field" << std::endl;
+            if(!vectorFieldData["width"].isNull()) {
+                if(vectorFieldData["width"].asFloat() < 1) {
+                    nWidth = ((float) width) * vectorFieldData["width"].asFloat();
+                } else {
+                    nWidth = vectorFieldData["width"].asInt();
+                }
+            }
+            if(!vectorFieldData["height"].isNull()) {
+                if(vectorFieldData["height"].asFloat() < 1) {
+                    nHeight = ((float) height) * vectorFieldData["height"].asFloat();
+                } else {
+                    nHeight = vectorFieldData["height"].asInt();
+                }
+            }
+            
+            // Which channel to detect the edge on
+            // Example: 0 = red channel, 3 = alpha channel
+            uint32_t channel = 0;
+            if(!vectorFieldData["channel"].isNull()) {
+                channel = vectorFieldData["channel"].asUInt();
+
+                if(channel >= components) {
+                    std::cout << "\tWarning: Channel cannot be " << channel << std::endl;
+                    channel = 0;
+                }
+            }
+
+            if(nWidth < 1 || nHeight < 1) {
+                std::cout << "\tFailed to calculate ssipg field: illegal dimensions" << std::endl;
+            }
+            else {
+                std::cout << "\tResize to: " << nWidth << ", " << nHeight << std::endl;
+                int32_t* signedData = new int32_t[nWidth * nHeight * 2];
+                
+                // Converting coordinates
+                uint32_t scaleX = width / nWidth;
+                uint32_t scaleY = height / nHeight;
+
+                // For each of the new pixels
+                for(int y = 0; y < nHeight; ++ y) {
+                    for(int x = 0; x < nWidth; ++ x) {
+                        if(image[(x * scaleX + (y * scaleY * width)) * components + channel] > 0) {
+                            signedData[(x + (y * nHeight)) * 2 + 0] = 0;
+                            signedData[(x + (y * nHeight)) * 2 + 1] = 0;
+                            continue;
+                        }
+
+                        // Determining the shortest distance squared
+                        bool pixelFound = false;
+                        float shortestDistanceSq;
+
+                        // The farthest distance (in original pixels) that should be scanned
+                        uint32_t maxDist = x;
+                        if(maxDist < y) { maxDist = y; }
+                        if(maxDist < nWidth - x) { maxDist = nWidth - x; }
+                        if(maxDist < nHeight - y) { maxDist = nHeight - y; }
+
+                        for(uint32_t radius = 1; radius < maxDist; ++ radius) {
+                            // Begin of spiral algorithm
+                            for(uint8_t direction = 0; direction < 4; ++ direction) {
+                                // 0  >  1
+                                //
+                                // ^     v
+                                //
+                                // 3  <  2
+
+                                // The coordinates of the pixel that will be checked in the original image
+                                // (Yes these are supposed to be signed)
+                                int32_t scanX = (direction == 0 || direction == 3) ? (x * scaleX - radius) : (x * scaleX + radius);
+                                int32_t scanY = (direction == 0 || direction == 1) ? (y * scaleY - radius) : (y * scaleY + radius);
+
+                                // Stepping
+                                for(uint32_t step = 0; step <= radius * 2; ++ step) {
+
+                                    // Move the scanning coordinates based on direction
+                                    if(step > 0) {
+                                        if(direction == 0) {
+                                            ++ scanX;
+                                        } else if(direction == 1) {
+                                            ++ scanY;
+                                        } else if(direction == 2) {
+                                            -- scanX;
+                                        } else if(direction == 3) {
+                                            -- scanY;
+                                        }
+                                    }
+
+                                    // Do not check pixels that are outside the bounds
+                                    if(scanX < 0 || scanX >= width || scanY < 0 || scanY >= height) {
+                                        continue;
+                                    }
+
+                                    // If this pixel is marked
+                                    if(image[(scanX + (scanY * width)) * components + channel] > 0) {
+                                        float distanceSq =
+                                            (((x * scaleX) - scanX) * ((x * scaleX) - scanX)) +
+                                            (((y * scaleY) - scanY) * ((y * scaleY) - scanY));
+
+                                        // This is the first different pixel located
+                                        if(!pixelFound) {
+                                            // Then it is the closest so far
+                                            shortestDistanceSq = distanceSq;
+                                            signedData[(x + (y * nHeight)) * 2 + 0] = scanX - x;
+                                            signedData[(x + (y * nHeight)) * 2 + 1] = scanY - y;
+
+                                            // Slight optimization: reduce maximum scanning distance
+                                            float nMaxDist = std::ceil(std::sqrt(shortestDistanceSq));
+                                            if(nMaxDist < maxDist) { maxDist = nMaxDist; }
+
+                                            // Remember that the first pixel was already located
+                                            pixelFound = true;
+                                        }
+
+                                        // This is yet another pixel located
+                                        else if(distanceSq < shortestDistanceSq) {
+                                            // Update shortest distance
+                                            shortestDistanceSq = distanceSq;
+                                            
+                                            signedData[(x + (y * nHeight)) * 2 + 0] = scanX - x;
+                                            signedData[(x + (y * nHeight)) * 2 + 1] = scanY - y;
+
+                                            // Slight optimization: reduce maximum scanning distance
+                                            float nMaxDist = std::ceil(std::sqrt(shortestDistanceSq));
+                                            if(nMaxDist < maxDist) { maxDist = nMaxDist; }
+
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // If for some reason future image files can only support >=3 channels, this is what needs to change
+                uint32_t nComponents = 3;
+
+                // New image
+                unsigned char* nImage = new unsigned char[nWidth * nHeight * nComponents];
+                
+                // Convert to unsigned bytes
+                for(int y = 0; y < nHeight; ++ y) {
+                    for(int x = 0; x < nWidth; ++ x) {
+                        int32_t dx = signedData[(x + (y * nHeight)) * 2 + 0];
+                        int32_t dy = signedData[(x + (y * nHeight)) * 2 + 1];
+                        
+                        dx += 127;
+                        dy += 127;
+                        
+                        if(dx < 0) { dx = 0; }
+                        if(dy < 0) { dy = 0; }
+                        if(dx >= 255) { dx = 255; }
+                        if(dy >= 255) { dy = 255; }
+
+                        // If for some reason nComponents > 1, this is necessary
+                        for(unsigned int juliet = 0; juliet < nComponents; ++ juliet) {
+                            nImage[((x + (y * nWidth)) * nComponents) + juliet] = 0.f;
+                        }
+                        
+                        nImage[((x + (y * nWidth)) * nComponents) + 0] = dx;
+                        nImage[((x + (y * nWidth)) * nComponents) + 1] = dy;
+                    }
+                }
+                
+                delete[] signedData;
+
+                // Swap out image
+                if(manuallyFreeImage) {
+                    delete[] image;
+                } else {
+                    stbi_image_free(image);
+                }
+                manuallyFreeImage = true;
+                width = nWidth;
+                height = nHeight;
+                image = nImage;
+                components = nComponents;
+            }
+        }
 
         const Json::Value& distanceFieldData = params["distanceField"];
         if(!distanceFieldData.isNull()) {
