@@ -5,13 +5,13 @@
     <WorkspaceConfiguration Name="Debug" Selected="no">
       <Project Name="main" ConfigName="Debug"/>
     </WorkspaceConfiguration>
-    <WorkspaceConfiguration Name="Release" Selected="yes">
+    <WorkspaceConfiguration Name="Release" Selected="no">
       <Project Name="main" ConfigName="Release"/>
     </WorkspaceConfiguration>
     <WorkspaceConfiguration Name="WinDebug" Selected="no">
       <Project Name="main" ConfigName="WinDebug"/>
     </WorkspaceConfiguration>
-    <WorkspaceConfiguration Name="WinRelease" Selected="no">
+    <WorkspaceConfiguration Name="WinRelease" Selected="yes">
       <Project Name="main" ConfigName="WinRelease"/>
     </WorkspaceConfiguration>
   </BuildMatrix>
