@@ -12,6 +12,8 @@
 
 #include "Convert.hpp"
 
+bool outputVerbose = false;
+
 bool equivalentJson(const Json::Value& val1, const Json::Value& val2) {
     return val1 == val2;
 }
@@ -39,7 +41,7 @@ enum ObjectType {
 // If this returns true, then all files of this type will be re-converted.
 // This is useful for debugging WIP converters.
 bool isWorkInProgressType(const ObjectType& type) {
-    return type == IMAGE;
+    return false;//type == IMAGE;
 }
 
 void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
@@ -164,9 +166,11 @@ public:
         
         objects.push_back(object);
         
-        std::cout << "Resource: name = " << object.mName << std::endl;
-        std::cout << "\ttype = " << typeToString(object.mType) << std::endl;
-        std::cout << "\tfile = " << object.mFile << std::endl;
+        if(outputVerbose) {
+            std::cout << "Resource: name = " << object.mName << std::endl;
+            std::cout << "\ttype = " << typeToString(object.mType) << std::endl;
+            std::cout << "\tfile = " << object.mFile << std::endl;
+        }
     }
     
     void recursiveSearch(const boost::filesystem::path& romeo, 
@@ -198,7 +202,9 @@ public:
             else {
                 if(juliet.has_filename() && juliet.extension() == extension) {
                     results.push_back(juliet);
-                    std::cout << "\t" << juliet.c_str() << std::endl;
+                    if(outputVerbose) {
+                        std::cout << "\t" << juliet.c_str() << std::endl;
+                    }
                 }
             }
         }
@@ -244,6 +250,7 @@ public:
             outputDir = mDir / (configData["output"].asString());
             obfuscate = configData["obfuscate"].asBool();
             forceOverwriteOutput = configData["force-overwrite-output"].asBool();
+            outputVerbose = configData["output-verbose"].asBool();
 
             if(!configData["intermediate"].isNull()) {
                 useIntermediate = true;
@@ -342,12 +349,12 @@ public:
                 parseObject(objectData, objectFile);
             }
             else {
-                std::cout << "Warning! Resource declared at " << objectFile << " is not valid!" << std::endl;
+                std::cout << "Warning! Resource declared at " << objectFile << " is not valid! (value = " << objectData.toStyledString() << ")" << std::endl;
             }
         }
         std::cout << std::endl;
 
-        // Locate errors
+        // Detect naming conflicts
         {
             typedef std::vector<boost::filesystem::path> PathList;
             typedef std::pair<std::string, PathList> NameObjectListPair;
@@ -403,7 +410,7 @@ public:
         }
         std::cout << std::endl;
 
-        // Do some important pre-calculations
+        // Determine the final output filename
         {
             uint32_t seqName = 0;
             for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
@@ -418,9 +425,12 @@ public:
                 }
                 else {
                     std::stringstream ss;
+                    /*
                     ss << (seqName ++);
                     ss << "_";
                     ss << object.mFile.filename().string();
+                    */
+                    ss << object.mName;
                     outputObjectFile /= ss.str();
                 }
 
@@ -449,7 +459,9 @@ public:
 
                 delete[] totalData;
 
-                std::cout << "\t" << object.mOriginalHash << std::endl;
+                if(outputVerbose) {
+                    std::cout << "\t" << object.mOriginalHash << std::endl;
+                }
             }
             std::cout << std::endl;
 
@@ -492,7 +504,10 @@ public:
                         const Json::Value& checkParams = metadata["params"];
 
                         if(checkHash == object.mOriginalHash && checkType == object.mType && equivalentJson(checkParams, object.mParams) && !isWorkInProgressType(object.mType)) {
-                            std::cout << "\tCopy: " << object.mName << std::endl;
+                            
+                            if(outputVerbose) {
+                                std::cout << "\tCopy: " << object.mName << std::endl;
+                            }
                             object.mSkipTranslate = true;
 
                             boost::filesystem::copy(intermediateDir / (metadata["file"].asString()), object.mOutputFile);
@@ -532,7 +547,9 @@ public:
             for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
                 Object& object = *iter;
 
-                std::cout << object.mName << " [" << typeToString(object.mType) << "]" << std::endl;
+                if(outputVerbose) {
+                    std::cout << object.mName << " [" << typeToString(object.mType) << "]" << std::endl;
+                }
 
                 if(!object.mSkipTranslate || isWorkInProgressType(object.mType)) {
                     std::cout << "\tTranslating..." << std::endl;
@@ -578,7 +595,7 @@ public:
                 ++ jsonListIndex;
             }
             std::cout << std::endl;
-            std::cout << numUpdates << " file(s) updated" << std::endl;
+            std::cout << numUpdates << " file(s) translated" << std::endl;
             std::cout << std::endl;
 
             if(useIntermediate) {

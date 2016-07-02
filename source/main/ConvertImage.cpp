@@ -191,8 +191,8 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                             nImage[((x + (y * nWidth)) * nComponents) + juliet] = 0.f;
                         }
                         
-                        nImage[((x + (y * nWidth)) * nComponents) + 0] = vx * 255.f;
-                        nImage[((x + (y * nWidth)) * nComponents) + 1] = vy * 255.f;
+                        nImage[((x + (y * nWidth)) * nComponents) + 0] = std::floor(vx * 256.f);
+                        nImage[((x + (y * nWidth)) * nComponents) + 1] = std::floor(vy * 256.f);
                     }
                 }
                 
