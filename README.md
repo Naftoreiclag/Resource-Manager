@@ -12,7 +12,11 @@ This yet-unnamed project simplifies packaging of files meant to be shipped with 
 - I needed my own file format for 3D models.
 - I wanted to easily manage the conversion of high-quality source files into lower-quality RAM-friendly files. (e.g. automatic downsampling of 4k "source, tga" textures into 1k "GPU-friendly" textures)
 - I did not want to constantly keep resource filenames and paths in sync with the string literals in my code.
+
+
 This project processes a resource project directory into a single "packaged" directory through the following steps:
+
+
 1. Search the project tree for JSON files describing how to process neighboring resource files into the "run-time ready" format and specifying an absolute global name for each resource ("King.image" instead of "King.png").
 2. Process all files as specified and output into a single directory.
 3. Produce a single JSON dictionary translating those absolute global names into files which are read from ("the contents of 'King.image' are found in '60_King.png'")
