@@ -1,5 +1,0 @@
-{
-    "name" : "paddock-model",
-    "type" : "model",
-    "file" : "model/duncan.model"
-}

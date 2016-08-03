@@ -1,5 +1,0 @@
-{
-    "name" : "duncan-material",
-    "type" : "material",
-    "file" : "material/duncan.material"
-}

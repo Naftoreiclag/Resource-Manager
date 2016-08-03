@@ -1,5 +1,0 @@
-{
-    "name" : "graymalkin-model",
-    "type" : "model",
-    "file" : "model/duncan.model"
-}
