@@ -12,6 +12,7 @@
 
 #include "Convert.hpp"
 
+// Useful for debug information, but significantly slows down packaging
 bool outputVerbose = false;
 
 bool equivalentJson(const Json::Value& val1, const Json::Value& val2) {
@@ -33,6 +34,7 @@ enum ObjectType {
     TEXTURE,
     GEOMETRY,
     FONT,
+    WAVEFORM,
 
     
     OTHER
@@ -41,11 +43,10 @@ enum ObjectType {
 // If this returns true, then all files of this type will be re-converted.
 // This is useful for debugging WIP converters.
 bool isWorkInProgressType(const ObjectType& type) {
-    return false;//type == IMAGE;
+    return type == WAVEFORM;
 }
 
 void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
-
     switch(otype) {
         case IMAGE: {
             convertImage(fromFile, outputFile, params, modifyFilename);
@@ -57,6 +58,10 @@ void translateData(const ObjectType& otype, const boost::filesystem::path& fromF
         }
         case FONT: {
             convertFont(fromFile, outputFile, params, modifyFilename);
+            break;
+        }
+        case WAVEFORM: {
+            convertWaveform(fromFile, outputFile, params, modifyFilename);
             break;
         }
         default: {
@@ -84,6 +89,7 @@ std::string typeToString(const ObjectType& tpe) {
         case TEXTURE: return "texture";
         case GEOMETRY: return "geometry";
         case FONT: return "font";
+        case WAVEFORM: return "waveform";
         default: return "other";
     }
 }
@@ -117,6 +123,8 @@ ObjectType stringToType(const std::string& str) {
         return GEOMETRY;
     } else if(str == "font") {
         return FONT;
+    } else if(str == "waveform") {
+        return WAVEFORM;
     }
     return OTHER;
 }
@@ -210,8 +218,6 @@ public:
         }
     }
     
-    
-    
     bool process(std::string filename) {
         std::cout << "Processing: " << filename << std::endl;
         mFile = filename;
@@ -234,13 +240,25 @@ public:
         std::cout << "\t" << mName << std::endl;
         std::cout << std::endl;
         
+        // Configuration file location
         boost::filesystem::path configFile = mDir / "compile.config";
+        
+        /* Default configuration:
+         *      no obfuscation
+         *      no ignored directories
+         *      output directory is named "__output__" and is a sub-directory of the project's root directory
+         *      previous output not overwritten
+         *      no intermediate directory / no intermediate data used
+         * 
+         */
         bool obfuscate = false;
         std::vector<boost::filesystem::path> ignoreDirs;
         boost::filesystem::path outputDir = mDir / "__output__";
         bool forceOverwriteOutput = false;
         boost::filesystem::path intermediateDir;
         bool useIntermediate = false;
+        
+        // Try read configuration
         if(boost::filesystem::exists(configFile)) {
             Json::Value configData;
             std::ifstream fileStream(configFile.string().c_str());
@@ -265,14 +283,16 @@ public:
                 ignoreDirs.push_back(mDir / (ignore.asString()));
             }
         }
+        
+        // Print configuration data
         std::cout << "Configuration:" << std::endl;
-        std::cout << "\toutput = " << outputDir << std::endl;
+        std::cout << "\tOutput dir: " << outputDir << std::endl;
         if(useIntermediate) {
-            std::cout << "\tintermediate = " << intermediateDir << std::endl;
+            std::cout << "\tIntermediate dir: " << intermediateDir << std::endl;
         } else {
-            std::cout << "\tuse intermediate = false" << std::endl;
+            std::cout << "\tIntermediate data not used" << std::endl;
         }
-        std::cout << "\tobfuscate = " << (obfuscate ? "true" : "false") << std::endl;
+        std::cout << "\tObfuscation " << (obfuscate ? "enabled" : "disabled") << std::endl;
         std::cout << std::endl;
         
         if(boost::filesystem::exists(outputDir)) {
@@ -627,6 +647,7 @@ public:
 };
 
 int main(int argc, char* argv[]) {
+    
     if(argc <= 1) {
         std::cout << "\n"
         "\nCompiles a resource project into a load-ready resource package."
@@ -635,7 +656,7 @@ int main(int argc, char* argv[]) {
         "\n"
         ;
         
-        // ../../../example2/project/core.project
+        // ../../../example/project/core.project
         
         return 0;
     }

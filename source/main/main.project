@@ -55,6 +55,7 @@
     <File Name="ConvertFont.cpp"/>
     <File Name="StreamWrite.hpp"/>
     <File Name="StreamWrite.cpp"/>
+    <File Name="ConvertWaveform.cpp"/>
   </VirtualDirectory>
   <VirtualDirectory Name="lib">
     <VirtualDirectory Name="jsoncpp">
@@ -228,20 +229,30 @@
         <IncludePath Value="../../libraries/murmur3"/>
         <IncludePath Value="$(BOOST_HOME)"/>
         <IncludePath Value="$(ASSIMP_HOME)/include"/>
+        <IncludePath Value="$(OGG_HOME)/include"/>
+        <IncludePath Value="$(VORBIS_HOME)/include"/>
         <Preprocessor Value="NDEBUG"/>
       </Compiler>
       <Linker Options="" Required="yes">
         <LibraryPath Value="$(BOOST_HOME)/lib"/>
         <LibraryPath Value="$(ASSIMP_HOME)/lib"/>
+        <LibraryPath Value="$(OGG_HOME)/lib"/>
+        <LibraryPath Value="$(VORBIS_HOME)/lib"/>
         <Library Value="mingw32"/>
         <Library Value="boost_system-mgw51-s-1_59"/>
         <Library Value="boost_filesystem-mgw51-s-1_59"/>
         <Library Value="assimp"/>
+        <Library Value="ogg.dll"/>
+        <Library Value="vorbis.dll"/>
+        <Library Value="vorbisfile.dll"/>
+        <Library Value="vorbisenc.dll"/>
       </Linker>
       <ResourceCompiler Options="" Required="no"/>
       <General OutputFile="$(IntermediateDirectory)/$(ProjectName)" IntermediateDirectory="./Release" Command="./$(ProjectName)" CommandArguments="" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
       <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
-        <![CDATA[ASSIMP_HOME=../../dependencies-win/mingw-w64/assimp-3.2]]>
+        <![CDATA[ASSIMP_HOME=../../dependencies-win/mingw-w64/assimp-3.2
+OGG_HOME=../../dependencies-win/mingw-w64/ogg-1.3.2
+VORBIS_HOME=../../dependencies-win/mingw-w64/vorbis-1.3.5]]>
       </Environment>
       <Debugger IsRemote="no" RemoteHostName="" RemoteHostPort="" DebuggerPath="" IsExtended="yes">
         <DebuggerSearchPaths/>
@@ -251,6 +262,8 @@
       <PreBuild/>
       <PostBuild>
         <Command Enabled="yes">cp $(ASSIMP_HOME)/bin/*.dll $(IntermediateDirectory)</Command>
+        <Command Enabled="yes">cp $(OGG_HOME)/bin/*.dll $(IntermediateDirectory)</Command>
+        <Command Enabled="yes">cp $(VORBIS_HOME)/bin/*.dll $(IntermediateDirectory)</Command>
       </PostBuild>
       <CustomBuild Enabled="no">
         <RebuildCommand/>

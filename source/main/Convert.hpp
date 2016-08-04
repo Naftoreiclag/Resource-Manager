@@ -11,6 +11,6 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 void convertMiscellaneous(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename = true);
 void convertGeometry(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename = true);
 void convertFont(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename = true);
-
+void convertWaveform(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename = true);
 
 #endif // CONVERT_HPP
