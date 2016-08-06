@@ -648,17 +648,11 @@ public:
 };
 
 int main(int argc, char* argv[]) {
-    
     if(argc <= 1) {
-        std::cout << "\n"
-        "\nCompiles a resource project into a load-ready resource package."
-        "\n"
-        "\nUsage: MACBETH source"
-        "\n"
-        ;
-        
-        // ../../../example/project/core.project
-        
+        std::cout << "Error: must supply path to project definition file!" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Usage: " << argv[0] << " <path to .project file>" <<std::endl;
+        std::cout << std::endl;
         return 0;
     }
     
