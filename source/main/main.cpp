@@ -69,6 +69,7 @@ void translateData(const ObjectType& otype, const boost::filesystem::path& fromF
             break;
         }
     }
+    std::cout << std::endl;
     std::ifstream sizeTest(outputFile.string().c_str(), std::ios::binary | std::ios::ate);
     filesize = sizeTest.tellg();
 }

@@ -11,7 +11,22 @@
 // TODO: add support for multiple channels
 
 struct FlacUserData {
+    const boost::filesystem::path* outputFile;
+    std::ofstream* outputData;
     
+    unsigned int inputSampleRate;
+    unsigned int inputBitsPerSample;
+    unsigned int inputNumChannels;
+    
+    float paramVbrQuality;
+    
+    vorbis_info outputVorbisInfo;
+    int outputNumChannels;
+    vorbis_dsp_state outputVorbisDspState;
+    vorbis_block outputVorbisBlock;
+    ogg_stream_state outputOggStream;
+    ogg_page outputOggPage;
+    vorbis_comment outputVorbisMetadata;
 };
 
 FLAC__StreamDecoderWriteStatus flacDecoderWriteCallback(
@@ -20,12 +35,132 @@ FLAC__StreamDecoderWriteStatus flacDecoderWriteCallback(
     const FLAC__int32* const inputBuffer[],
     void* userData) {
     
+    FlacUserData& p = *(reinterpret_cast<FlacUserData*>(userData));
+    int errorCode;
+    
+    // Called only once
+    if(inputFrame->header.number.sample_number == 0) {
+        // Write intialization
+        vorbis_info_init(&p.outputVorbisInfo);
+        p.outputNumChannels = 1;
+        errorCode = vorbis_encode_init_vbr(&p.outputVorbisInfo, p.outputNumChannels, p.inputSampleRate, p.paramVbrQuality);
+        if(errorCode) {
+            std::cout << "\tFailed to initialize encoding for VBR!" << std::endl;
+            return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+        }
+        
+        errorCode = vorbis_analysis_init(&p.outputVorbisDspState, &p.outputVorbisInfo);
+        if(errorCode) {
+            std::cout << "\tFailed to initialize vorbis dsp state!" << std::endl;
+            return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+        }
+        
+        //
+        vorbis_block_init(&p.outputVorbisDspState, &p.outputVorbisBlock);
+        
+        int cerealNumber = 1337; // Why?
+        
+        ogg_stream_init(&p.outputOggStream, cerealNumber);
+        
+        
+        p.outputData = new std::ofstream(p.outputFile->string().c_str(), std::ios::out | std::ios::binary);
+        
+        {
+            ogg_packet streamIdentity;
+            ogg_packet serializedMetadata;
+            ogg_packet codebooks;
+            
+            vorbis_analysis_headerout(&p.outputVorbisDspState, &p.outputVorbisMetadata, &streamIdentity, &serializedMetadata, &codebooks);
+            
+            ogg_stream_packetin(&p.outputOggStream, &streamIdentity);
+            ogg_stream_packetin(&p.outputOggStream, &serializedMetadata);
+            ogg_stream_packetin(&p.outputOggStream, &codebooks);
+            
+            while(true) {
+                int ret = ogg_stream_flush(&p.outputOggStream, &p.outputOggPage);
+                if(ret == 0) {
+                    break;
+                }
+                p.outputData->write(reinterpret_cast<char*>(p.outputOggPage.header), p.outputOggPage.header_len);
+                p.outputData->write(reinterpret_cast<char*>(p.outputOggPage.body), p.outputOggPage.body_len);
+            }
+        }
+    }
+    
+    // (Past tense "read")
+    unsigned int numSamplesRead = inputFrame->header.blocksize;
+    
+    // Get a buffer which we must write to
+    float** outputBuffers = vorbis_analysis_buffer(&p.outputVorbisDspState, numSamplesRead);
+    
+    float maxAbsVal = (1 << (p.inputBitsPerSample - 1));
+    
+    for(unsigned int i = 0; i < numSamplesRead; ++ i) {
+        // only one channel is supported right now
+        outputBuffers[0][i] = inputBuffer[0][i] / maxAbsVal;
+    }
+    
+    // Tell vorbis that we are done writing to the buffer gained previously
+    // (Necessary because we technically could have submitted less data than was requested,
+    // and also because we need to notify vorbis that we are done writing for now)
+    vorbis_analysis_wrote(&p.outputVorbisDspState, numSamplesRead);
+
+    //
+    while(vorbis_analysis_blockout(&p.outputVorbisDspState, &p.outputVorbisBlock) == 1) {
+        vorbis_analysis(&p.outputVorbisBlock, NULL);
+        vorbis_bitrate_addblock(&p.outputVorbisBlock);
+        
+        ogg_packet outputOggPacket;
+        while(vorbis_bitrate_flushpacket(&p.outputVorbisDspState, &outputOggPacket)) {
+            ogg_stream_packetin(&p.outputOggStream, &outputOggPacket);
+            while(true) {
+                int ret = ogg_stream_pageout(&p.outputOggStream, &p.outputOggPage);
+                if(ret == 0) {
+                    break;
+                }
+                p.outputData->write(reinterpret_cast<char*>(p.outputOggPage.header), p.outputOggPage.header_len);
+                p.outputData->write(reinterpret_cast<char*>(p.outputOggPage.body), p.outputOggPage.body_len);
+            }
+        }
+    }
+    
+    return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
 }
 
 void flacDecoderMetadataCallback(
     const FLAC__StreamDecoder* inputFlacDecoder,
     const FLAC__StreamMetadata* inputMetadata,
     void* userData) {
+    
+    FlacUserData& p = *(reinterpret_cast<FlacUserData*>(userData));
+    
+    // Print file metadata
+    std::cout << "\tInput file info:" << std::endl;
+    std::cout << "\t\tType: FLAC" << std::endl;
+    
+    // comments
+    if(inputMetadata->type == FLAC__METADATA_TYPE_VORBIS_COMMENT) {
+        FLAC__StreamMetadata_VorbisComment_Entry* comments = inputMetadata->data.vorbis_comment.comments;
+        int numComments = inputMetadata->data.vorbis_comment.num_comments;
+        std::cout << "\t\tMetadata:" << std::endl;
+        for(int i = 0; i < numComments; ++ i) {
+            std::cout << "\t\t" << i << ".\t" << comments[i].entry << std::endl;
+        }
+        const FLAC__StreamMetadata_VorbisComment_Entry& vendorString = inputMetadata->data.vorbis_comment.vendor_string;
+        std::cout << "\t\tVendor string: " << vendorString.entry << std::endl;
+    }
+    
+    // other
+    if(inputMetadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
+        p.inputSampleRate = inputMetadata->data.stream_info.sample_rate;
+        p.inputBitsPerSample = inputMetadata->data.stream_info.bits_per_sample;
+        p.inputNumChannels = inputMetadata->data.stream_info.channels;
+        
+        std::cout << "\t\tChannel count: " << p.inputNumChannels << std::endl;
+        std::cout << "\t\tSampling rate: " << p.inputSampleRate << "hz" << std::endl;
+        std::cout << "\t\tTotal samples: " << inputMetadata->data.stream_info.total_samples << std::endl;
+        std::cout << "\t\tSample type: signed " << p.inputBitsPerSample << "-bit" << std::endl;
+    }
     
 }
 
@@ -34,6 +169,7 @@ void flacDecoderErrorCallback(
     const FLAC__StreamDecoderErrorStatus errorStatus,
     void* userData) {
     
+    std::cout << "\t\tFLAC error callback: " << FLAC__StreamDecoderErrorStatusString[errorStatus];
 }
 
 enum WaveformEncodingMode {
@@ -56,6 +192,11 @@ struct TagPair {
     std::string tag;
     std::string data;
 };
+
+/* TODO: I'm sure there are plenty of memory leaks occuring during errors (return's without proper cleanup). These need fixing eventually.
+ * But then again, another reason I made this resource manager is to allow this kind of carelessness without effecting the end application
+ * (whatever will be using the output resources).
+ */
 
 void convertWaveform(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
     
@@ -119,28 +260,41 @@ void convertWaveform(const boost::filesystem::path& fromFile, const boost::files
         }
     }
     
+    // Prepare metadata for output file
+    vorbis_comment outputVorbisMetadata;
+    vorbis_comment_init(&outputVorbisMetadata);
+    
+    for(std::vector<TagPair>::iterator iter = paramTags.begin(); iter != paramTags.end(); ++ iter) {
+        TagPair& tagPair = *iter;
+        vorbis_comment_add_tag(&outputVorbisMetadata, tagPair.tag.c_str(), tagPair.data.c_str());
+    }
+    
     
     switch(paramWaveformInputFileType) {
         case WaveformInputFileType::OGG_VORBIS: {
             const vorbis_info* inputVorbisInfo = ov_info(&inputVorbisFile, -1);
-            // Print various file data
+            
+            // Print file metadata
             {
+                std::cout << "\tInput file info:" << std::endl;
+                std::cout << "\t\tType: ogg-vorbis" << std::endl;
+                
                 // comments
                 {
                     const vorbis_comment* commentData = ov_comment(&inputVorbisFile, -1);
                     char** comments = commentData->user_comments;
                     int numComments = commentData->comments;
-                    std::cout << "\tVorbis comments:" << std::endl;
+                    std::cout << "\t\tMetadata:" << std::endl;
                     for(int i = 0; i < numComments; ++ i) {
-                        std::cout << "\t" << i << ".\t" << comments[i] << std::endl;
+                        std::cout << "\t\t" << i << ".\t" << comments[i] << std::endl;
                     }
                 }
                 
                 // other
                 {
-                    std::cout << "\tVorbis encoder version: " << inputVorbisInfo->version << std::endl;
-                    std::cout << "\tNumber of channels: " << inputVorbisInfo->channels << std::endl;
-                    std::cout << "\tSampling rate: " << inputVorbisInfo->rate << "hz" << std::endl;
+                    std::cout << "\t\tEncoder version: " << inputVorbisInfo->version << std::endl;
+                    std::cout << "\t\tChannel count: " << inputVorbisInfo->channels << std::endl;
+                    std::cout << "\t\tSampling rate: " << inputVorbisInfo->rate << "hz" << std::endl;
                 }
             }
             
@@ -150,23 +304,15 @@ void convertWaveform(const boost::filesystem::path& fromFile, const boost::files
             int outputNumChannels = 1;
             errorCode = vorbis_encode_init_vbr(&outputVorbisInfo, outputNumChannels, inputVorbisInfo->rate, paramVbrQuality);
             if(errorCode) {
-                std::cout << "Failed to initialize encoding for VBR!" << std::endl;
+                std::cout << "\tFailed to initialize encoding for VBR!" << std::endl;
                 return;
             }
             
             vorbis_dsp_state outputVorbisDspState;
             errorCode = vorbis_analysis_init(&outputVorbisDspState, &outputVorbisInfo);
             if(errorCode) {
-                std::cout << "Failed to initialize vorbis dsp state!" << std::endl;
+                std::cout << "\tFailed to initialize vorbis dsp state!" << std::endl;
                 return;
-            }
-            
-            vorbis_comment outputVorbisMetadata;
-            vorbis_comment_init(&outputVorbisMetadata);
-            
-            for(std::vector<TagPair>::iterator iter = paramTags.begin(); iter != paramTags.end(); ++ iter) {
-                TagPair& tagPair = *iter;
-                vorbis_comment_add_tag(&outputVorbisMetadata, tagPair.tag.c_str(), tagPair.data.c_str());
             }
             
             //
@@ -298,11 +444,14 @@ void convertWaveform(const boost::filesystem::path& fromFile, const boost::files
             
             FLAC__stream_decoder_set_md5_checking(inputFlacDecoder, true); // Why not?
             
-            FlacUserData userData;
+            FlacUserData p;
+            p.paramVbrQuality = paramVbrQuality;
+            p.outputFile = &outputFile;
+            p.outputVorbisMetadata = outputVorbisMetadata;
             
             FLAC__StreamDecoderInitStatus inputDecoderStatus = 
                 FLAC__stream_decoder_init_file(inputFlacDecoder, fromFile.string().c_str(),
-                flacDecoderWriteCallback, flacDecoderMetadataCallback, flacDecoderErrorCallback, &userData);
+                flacDecoderWriteCallback, flacDecoderMetadataCallback, flacDecoderErrorCallback, &p);
             
             if(inputDecoderStatus != FLAC__STREAM_DECODER_INIT_STATUS_OK) {
                 std::cout << "\tFailure during FLAC decoder initialization: "
@@ -315,8 +464,17 @@ void convertWaveform(const boost::filesystem::path& fromFile, const boost::files
             
             std::cout << "\tFLAC decoder status: "
                 << FLAC__StreamDecoderStateString[FLAC__stream_decoder_get_state(inputFlacDecoder)] << std::endl;
-                
+            
+            // Reading cleanup
             FLAC__stream_decoder_delete(inputFlacDecoder);
+            
+            // Writing cleanup
+            delete p.outputData;
+            ogg_stream_clear(&p.outputOggStream);
+            vorbis_block_clear(&p.outputVorbisBlock);
+            vorbis_comment_clear(&p.outputVorbisMetadata);
+            vorbis_dsp_clear(&p.outputVorbisDspState);
+            vorbis_info_clear(&p.outputVorbisInfo);
             
             return;
         }
