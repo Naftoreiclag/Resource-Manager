@@ -1,0 +1,53 @@
+[
+    {
+        "name" : "WonderlandFromFLAC.waveform",
+        "type" : "waveform",
+        "file" : "Wonderland.flac",
+        "parameters" : {
+            "encoding-mode" : "VBR",
+            "vbr-quality" : 1.0,
+            "metadata" : {
+                "COMMENT" : "Test comment!"
+            }
+        }
+    },
+    {
+        "name" : "WonderlandMaxQuality.waveform",
+        "type" : "waveform",
+        "file" : "Wonderland.ogg",
+        "parameters" : {
+            "encoding-mode" : "VBR",
+            "vbr-quality" : 1.0,
+            "metadata" : {
+                "COMMENT" : "Test comment!"
+            }
+        }
+    },
+    {
+        "name" : "WonderlandHalfQuality.waveform",
+        "type" : "waveform",
+        "file" : "Wonderland.ogg",
+        "parameters" : {
+            "encoding-mode" : "VBR",
+            "vbr-quality" : 0.5
+        }
+    },
+    {
+        "name" : "WonderlandMinimumQuality.waveform",
+        "type" : "waveform",
+        "file" : "Wonderland.ogg",
+        "parameters" : {
+            "encoding-mode" : "VBR",
+            "vbr-quality" : 0.0
+        }
+    },
+    {
+        "name" : "WonderlandNegativeQuality.waveform",
+        "type" : "waveform",
+        "file" : "Wonderland.ogg",
+        "parameters" : {
+            "encoding-mode" : "VBR",
+            "vbr-quality" : -0.1
+        }
+    }
+]
