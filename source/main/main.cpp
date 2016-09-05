@@ -253,7 +253,8 @@ public:
         {
             Json::Value packageData = readJsonFile(mFile.string());
             
-            mName = packageData["name"].asString();
+            Json::Value& infoBox = packageData["info"];
+            mName = infoBox["name"].asString();
         }
         
         std::cout << "Project Name:" << std::endl;
