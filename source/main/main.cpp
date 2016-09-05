@@ -11,6 +11,7 @@
 #include "MurmurHash3.h"
 
 #include "Convert.hpp"
+#include "JsonUtil.hpp"
 
 // Useful for debug information, but significantly slows down packaging
 bool outputVerbose = false;
@@ -20,21 +21,24 @@ bool equivalentJson(const Json::Value& val1, const Json::Value& val2) {
 }
 
 enum ObjectType {
-    IMAGE,
-    MATERIAL,
-    MODEL,
+    IMAGE, // Image
+    MATERIAL, // Generic Json
+    MODEL, // Generic Json
     COMPUTE_SHADER,
     VERTEX_SHADER,
     TESS_CONTROL_SHADER,
     TESS_EVALUATION_SHADER,
     GEOMETRY_SHADER,
     FRAGMENT_SHADER,
-    SHADER_PROGRAM,
+    SHADER_PROGRAM, // Generic Json
     STRING,
-    TEXTURE,
-    GEOMETRY,
-    FONT,
-    WAVEFORM,
+    TEXTURE, // Generic Json
+    GEOMETRY, // Geometry
+    FONT, // Font
+    WAVEFORM, // Waveform
+    SCRIPT,
+    COMPONENT,
+    COMPOSITION,
 
     
     OTHER
@@ -43,11 +47,18 @@ enum ObjectType {
 // If this returns true, then all files of this type will be re-converted.
 // This is useful for debugging WIP converters.
 bool isWorkInProgressType(const ObjectType& type) {
-    return type == WAVEFORM;
+    return false;//type == WAVEFORM;
 }
 
 void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
     switch(otype) {
+        case MATERIAL:
+        case MODEL:
+        case SHADER_PROGRAM:
+        case TEXTURE: {
+            convertGenericJson(fromFile, outputFile, params, modifyFilename);
+            break;
+        }
         case IMAGE: {
             convertImage(fromFile, outputFile, params, modifyFilename);
             break;
@@ -91,6 +102,9 @@ std::string typeToString(const ObjectType& tpe) {
         case GEOMETRY: return "geometry";
         case FONT: return "font";
         case WAVEFORM: return "waveform";
+        case SCRIPT: return "script";
+        case COMPONENT: return "component";
+        case COMPOSITION: return "composition";
         default: return "other";
     }
 }
@@ -126,15 +140,22 @@ ObjectType stringToType(const std::string& str) {
         return FONT;
     } else if(str == "waveform") {
         return WAVEFORM;
+    } else if(str == "script") {
+        return SCRIPT;
+    } else if(str == "component") {
+        return COMPONENT;
+    } else if(str == "composition") {
+        return COMPOSITION;
     }
     return OTHER;
 }
         
-class Project {
+class Package {
 public:
-    Project() { }
-    ~Project() { }
+    Package() { }
+    ~Package() { }
     
+    // You won't see this in Java!
     struct Object {
         std::string mName;
         ObjectType mType;
@@ -219,22 +240,20 @@ public:
         }
     }
     
+    // 
     bool process(std::string filename) {
         std::cout << "Processing: " << filename << std::endl;
         mFile = filename;
         if(!boost::filesystem::exists(mFile)) {
-            std::cout << "Project file does not exist!" << std::endl;
+            std::cout << "Package file does not exist!" << std::endl;
             return false;
         }
         mDir = mFile.parent_path();
         
         {
-            Json::Value projectData;
-            std::ifstream fileStream(mFile.string().c_str());
-            fileStream >> projectData;
-            fileStream.close();
+            Json::Value packageData = readJsonFile(mFile.string());
             
-            mName = projectData["name"].asString();
+            mName = packageData["name"].asString();
         }
         
         std::cout << "Project Name:" << std::endl;
@@ -261,10 +280,7 @@ public:
         
         // Try read configuration
         if(boost::filesystem::exists(configFile)) {
-            Json::Value configData;
-            std::ifstream fileStream(configFile.string().c_str());
-            fileStream >> configData;
-            fileStream.close();
+            Json::Value configData = readJsonFile(configFile.string());
             
             outputDir = mDir / (configData["output"].asString());
             obfuscate = configData["obfuscate"].asBool();
@@ -349,10 +365,7 @@ public:
         
         for(std::vector<boost::filesystem::path>::iterator objectFileIter = objectFiles.begin(); objectFileIter != objectFiles.end(); ++ objectFileIter) {
             boost::filesystem::path& objectFile = *objectFileIter;
-            Json::Value objectData;
-            std::ifstream fileStream(objectFile.string().c_str());
-            fileStream >> objectData;
-            fileStream.close();
+            Json::Value objectData = readJsonFile(objectFile.string());
             
             if(objectData.isArray()) {
                 for(Json::ValueIterator valueIter = objectData.begin(); valueIter != objectData.end(); ++ valueIter) {
@@ -468,13 +481,13 @@ public:
 
                 Object& object = *iter;
 
-                std::ifstream reader(object.mFile.string().c_str(), std::ios::binary | std::ios::ate);
-                object.mOriginalSize = reader.tellg();
+                std::ifstream sizeTest(object.mFile.string().c_str(), std::ios::binary | std::ios::ate);
+                object.mOriginalSize = sizeTest.tellg();
 
                 char* totalData = new char[object.mOriginalSize];
-                reader.seekg(0, std::ios::beg);
-                reader.read(totalData, object.mOriginalSize);
-                reader.close();
+                sizeTest.seekg(0, std::ios::beg);
+                sizeTest.read(totalData, object.mOriginalSize);
+                sizeTest.close();
 
                 MurmurHash3_x86_32(totalData, object.mOriginalSize, 1337, &(object.mOriginalHash));
 
@@ -494,12 +507,7 @@ public:
                 std::cout << "None exists!" << std::endl;
             }
             else {
-                Json::Value previousCompilation;
-                {
-                    std::ifstream reader(intermediateFile.string().c_str());
-                    reader >> previousCompilation;
-                    reader.close();
-                }
+                Json::Value previousCompilation = readJsonFile(intermediateFile.string());
 
                 const Json::Value& metadataList = previousCompilation["metadata"];
                 for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
@@ -551,9 +559,7 @@ public:
             uint32_t metadataIndex = 0;
             if(useIntermediate) {
                 if(boost::filesystem::exists(intermediateFile)) {
-                    std::ifstream reader(intermediateFile.string().c_str());
-                    reader >> intermediateData;
-                    reader.close();
+                    intermediateData = readJsonFile(intermediateFile.string());
                     metadataIndex = intermediateData["metadata"].size();
                 }
             }
@@ -649,14 +655,14 @@ public:
 
 int main(int argc, char* argv[]) {
     if(argc <= 1) {
-        std::cout << "Error: must supply path to project definition file!" << std::endl;
+        std::cout << "Error: must supply path to package definition file!" << std::endl;
         std::cout << std::endl;
-        std::cout << "Usage: " << argv[0] << " <path to .project file>" <<std::endl;
+        std::cout << "Usage: " << argv[0] << " <path to .package file>" <<std::endl;
         std::cout << std::endl;
         return 0;
     }
     
-    Project project;
-    project.process(argv[1]);
+    Package package;
+    package.process(argv[1]);
     return 0;
 }

@@ -1,0 +1,8 @@
+# Resource manager uses a custom json interpreter which allows for yaml-style comments
+# Comments cannot share a line with non-comment data, and the first non-whitespace character must be a #
+# Multi-line comments are not yet supported
+{
+    "name" : "core",
+    "description" : "The core resources needed for the main application",
+    "comment" : "A cleaner and more practical example setup"
+}

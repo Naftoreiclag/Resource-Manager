@@ -56,6 +56,9 @@
     <File Name="StreamWrite.hpp"/>
     <File Name="StreamWrite.cpp"/>
     <File Name="ConvertWaveform.cpp"/>
+    <File Name="JsonUtil.hpp"/>
+    <File Name="JsonUtil.cpp"/>
+    <File Name="ConvertGenericJson.cpp"/>
   </VirtualDirectory>
   <VirtualDirectory Name="lib">
     <VirtualDirectory Name="jsoncpp">
