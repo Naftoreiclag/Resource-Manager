@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include <boost/filesystem.hpp>
 
@@ -16,8 +17,62 @@
 // Useful for debug information, but significantly slows down packaging
 bool outputVerbose = false;
 
-bool equivalentJson(const Json::Value& val1, const Json::Value& val2) {
-    return val1 == val2;
+// Might not be perfect
+// This is unbelievably slow. Use only for comparing json structures of limited size
+bool equivalentJson(const Json::Value& json1, const Json::Value& json2) {
+    if(json1.isNull()) return json2.isNull();
+    if(json1.isBool()) return json2.isBool() && json1.asBool() == json2.asBool();
+    if(json1.isUInt64() && json2.isUInt64()) return json1.asUInt64() == json2.asUInt64();
+    if(json1.isInt64() && json2.isInt64()) return json1.asInt64() == json2.asInt64();
+    if(json1.isUInt() && json2.isUInt()) return json1.asUInt() == json2.asUInt();
+    if(json1.isInt() && json2.isInt()) return json1.asInt() == json2.asInt();
+    if(json1.isDouble() && json2.isDouble()) return json1.asDouble() == json2.asDouble();
+    if(json1.isNumeric()) return json2.isNumeric() && json1.asDouble() == json2.asDouble();
+    if(json1.isString()) return json2.isString() && json1.asString() == json2.asString();
+    
+    if(json1.isArray()) {
+        if(json2.isArray() && json1.size() == json2.size()) {
+            std::vector<const Json::Value*> array1;
+            std::vector<const Json::Value*> array2;
+            
+            for(const Json::Value& val1 : json1) array1.push_back(&val1);
+            for(const Json::Value& val2 : json2) array2.push_back(&val2);
+            
+            for(const Json::Value* val1 : array1) {
+                auto match = array2.begin();
+                while(match != array2.end()) {
+                    if(equivalentJson(*val1, **match)) {
+                        break;
+                    }
+                    ++ match;
+                }
+                if(match == array2.end()) {
+                    return false;
+                } else {
+                    array2.erase(match);
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+    
+    if(json1.isObject()) {
+        if(json2.isObject() && json1.size() == json2.size()) {
+            for(Json::ValueConstIterator iter = json1.begin(); iter != json1.end(); ++ iter) {
+                const Json::Value& key = iter.key();
+                const Json::Value& value = *iter;
+                
+                if(!equivalentJson(value, json2[key.asString()])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+    
+    return false;
 }
 
 enum ObjectType {
@@ -177,7 +232,7 @@ public:
     boost::filesystem::path mFile;
     boost::filesystem::path mDir;
     
-    std::string mName;
+    Json::Value mPackageJson;
     
     std::vector<Object> objects;
     
@@ -247,19 +302,12 @@ public:
         if(!boost::filesystem::exists(mFile)) {
             std::cout << "Package file does not exist!" << std::endl;
             return false;
+        } else {
+            std::cout << "Package file found successfully" << std::endl;
         }
         mDir = mFile.parent_path();
         
-        {
-            Json::Value packageData = readJsonFile(mFile.string());
-            
-            Json::Value& infoBox = packageData["info"];
-            mName = infoBox["name"].asString();
-        }
-        
-        std::cout << "Project Name:" << std::endl;
-        std::cout << "\t" << mName << std::endl;
-        std::cout << std::endl;
+        mPackageJson = readJsonFile(mFile.string());
         
         // Configuration file location
         boost::filesystem::path configFile = mDir / "compile.config";
@@ -452,24 +500,18 @@ public:
                 Object& object = *iter;
 
                 boost::filesystem::path outputObjectFile = outputDir;
+                std::stringstream ss;
                 if(obfuscate) {
-                    std::stringstream ss;
-                    ss << (seqName ++);
-                    ss << ".r";
-                    outputObjectFile /= ss.str();
+                    ss << seqName;
                 }
                 else {
-                    std::stringstream ss;
-                    /*
-                    ss << (seqName ++);
-                    ss << "_";
-                    ss << object.mFile.filename().string();
-                    */
                     ss << object.mName;
-                    outputObjectFile /= ss.str();
                 }
+                outputObjectFile /= ss.str();
 
                 object.mOutputFile = outputObjectFile;
+                
+                seqName ++;
             }
         }
 
@@ -477,6 +519,8 @@ public:
             if(!boost::filesystem::exists(intermediateDir)) {
                 boost::filesystem::create_directories(intermediateDir);
             }
+            
+            // Calcuate the hashes of input files
             std::cout << "Calculating hashes..." << std::endl;
             for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
 
@@ -515,7 +559,7 @@ public:
 
                     /*
                      * If a pre-compiled file exists with exactly the same:
-                     *  Hash
+                     *  Input file hash
                      *  Configuration:
                      *      Type
                      *      Parameters
@@ -533,6 +577,14 @@ public:
                         ObjectType checkType = stringToType(metadata["type"].asString());
                         const Json::Value& checkParams = metadata["params"];
 
+                        /*
+                        if(object.mType == ObjectType::WAVEFORM) {
+                            std::cout << "Hash match: " << (checkHash == object.mOriginalHash) << std::endl;
+                            std::cout << "Type match: " << (checkType == object.mType) << std::endl;
+                            std::cout << "Parameter match: " << (equivalentJson(checkParams, object.mParams)) << std::endl;
+                        }
+                        */
+                        
                         if(checkHash == object.mOriginalHash && checkType == object.mType && equivalentJson(checkParams, object.mParams) && !isWorkInProgressType(object.mType)) {
                             
                             if(outputVerbose) {
@@ -568,7 +620,8 @@ public:
             uint64_t totalSize = 0;
             uint32_t numUpdates = 0;
 
-            Json::Value outputPackageData;
+            // Append the file provided by user
+            Json::Value outputPackageData = mPackageJson;
             Json::Value& objectListData = outputPackageData["resources"];
             uint32_t jsonListIndex = 0;
 
@@ -581,6 +634,9 @@ public:
 
                 if(!object.mSkipTranslate || isWorkInProgressType(object.mType)) {
                     std::cout << "\tTranslating..." << std::endl;
+                    if(isWorkInProgressType(object.mType)) {
+                        std::cout << "\t(WIP)" << std::endl;
+                    }
                     translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !obfuscate);
                     ++ numUpdates;
 
@@ -628,11 +684,7 @@ public:
 
             if(useIntermediate) {
                 std::cout << "Exporting intermediate.data... ";
-                {
-                    std::ofstream intermOutput(intermediateFile.string().c_str());
-                    intermOutput << intermediateData;
-                    intermOutput.close();
-                }
+                writeJsonFile(intermediateFile.string(), intermediateData, true);
                 std::cout << "Done!" << std::endl;
                 std::cout << std::endl;
             }
@@ -640,12 +692,8 @@ public:
             std::cout << "Exporting data.package... ";
 
             Json::Value& metricsData = outputPackageData["metrics"];
-            metricsData["totalSize"] = (Json::UInt64) totalSize;
-            {
-                std::ofstream finalOutputFile((outputDir / "data.package").string().c_str());
-                finalOutputFile << outputPackageData;
-                finalOutputFile.close();
-            }
+            metricsData["size"] = (Json::UInt64) totalSize;
+            writeJsonFile((outputDir / "data.package").string(), outputPackageData);
             std::cout << "Done!" << std::endl;
             std::cout << std::endl;
         }
