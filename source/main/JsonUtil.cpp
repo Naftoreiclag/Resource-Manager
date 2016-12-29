@@ -22,7 +22,9 @@ Json::Value readJsonFile(std::string filename) {
             }
         }
         
-        if(!isComment) {
+        if(isComment) {
+            ss << '\n';
+        } else {
             ss << line;
         }
     }
