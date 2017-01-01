@@ -1,6 +1,7 @@
 #include "Convert.hpp"
 
 #include <fstream>
+#include <functional>
 #include <iostream>
 
 #include "assimp/scene.h"
@@ -10,7 +11,7 @@
 #include "assimp/anim.h"
 
 #include "StreamWrite.hpp"
-
+    
 void debugAiNode(const aiScene* scene, const aiNode* node, unsigned int depth) {
 
     for(int c = 0; c < depth; ++ c) {
@@ -54,23 +55,38 @@ void debugAiNode(const aiScene* scene, const aiNode* node, unsigned int depth) {
     }
 }
 
-const aiNode* findFirstMeshNode(const aiNode* node) {
-    if(node->mNumMeshes > 0) {
+const aiNode* findNodeByLambda(const aiNode* node, std::function<bool(const aiNode*)> func) {
+    if(func(node)) {
         return node;
     }
-    
     for(unsigned int i = 0; i < node->mNumChildren; ++ i) {
-        const aiNode* search = findFirstMeshNode(node->mChildren[i]);
+        const aiNode* search = findNodeByLambda(node->mChildren[i], func);
         if(search) {
             return search;
         }
     }
     
-    return 0;
+    return nullptr;
 }
 
-namespace geo {
+const aiNode* findNodeByName(const aiNode* node, std::string name) {
+    //return node->FindNode(aiString(name));
+    
+    aiString aString(name);
+    return findNodeByLambda(node, [aString](const aiNode* node2) {
+            return node2->mName == aString;
+        });
+}
 
+uint32_t findNodeTreeSize(const aiNode* node) {
+    uint32_t sum = 1;
+    for(uint32_t i = 0; i < node->mNumChildren; ++ i) {
+        sum += findNodeTreeSize(node->mChildren[i]);
+    }
+    return sum;
+}
+
+    
 struct Vertex {
     // Position
     float x;
@@ -123,24 +139,64 @@ struct Triangle {
     uint32_t c;
 };
 
-typedef std::vector<Vertex> VertexBuffer;
-typedef std::vector<Triangle> TriangleBuffer;
-
-struct Mesh {
-    VertexBuffer vertices;
-    TriangleBuffer triangles;
-
-    bool useColor;
-    bool useUV;
-    bool useNormals;
-    bool usePositions;
-    bool useTangents;
-    bool useBitangents;
+struct Bone {
+    uint32_t mIndex;
+    uint32_t mParentIndex;
+    bool mHasParent;
+    
+    std::string mName;
+    std::vector<uint32_t> mChildren;
+    
+    Bone()
+    : mIndex(0)
+    , mParentIndex(0)
+    , mHasParent(false) {
+    }
 };
 
+typedef std::vector<Vertex> VertexBuffer;
+typedef std::vector<Triangle> TriangleBuffer;
+typedef std::vector<Bone> BoneBuffer;
+
+struct Mesh {
+    VertexBuffer mVertices;
+    TriangleBuffer mTriangles;
+    BoneBuffer mBones;
+
+    bool mUseColor;
+    bool mUseUV;
+    bool mUseNormals;
+    bool mUseLocations;
+    bool mUseTangents;
+    bool mUseBitangents;
+    bool mUseBoneWeights;
+    
+    
+};
+
+enum SkinningTechnique {
+    LINEAR_BLEND,
+    DUAL_QUAT,
+    IMPLICIT
+};
+
+SkinningTechnique stringToSkinningTechnique(std::string skinning) {
+    if(skinning == "linear-blend") {
+        return SkinningTechnique::LINEAR_BLEND;
+    }
+    else if(skinning == "dual-quaternion") {
+        return SkinningTechnique::DUAL_QUAT;
+    }
+    else if(skinning == "implicit") {
+        return SkinningTechnique::IMPLICIT;
+    }
+    
+    return SkinningTechnique::LINEAR_BLEND;
 }
+
+
 float floatsy(float val) {
-    return val < 0.00005f ? 0.f : val;
+    return val < 0.0000005f ? 0.f : val;
 }
 
 void printThis(const aiMatrix4x4& aoffsetMatrix) {
@@ -151,215 +207,375 @@ void printThis(const aiMatrix4x4& aoffsetMatrix) {
     std::cout << floatsy(aoffsetMatrix.d1) << "\t| " << floatsy(aoffsetMatrix.d2) << "\t| " << floatsy(aoffsetMatrix.d3) << "\t| " << floatsy(aoffsetMatrix.d4) << "\t| " << std::endl;
 }
 
+uint32_t recursiveBuildBoneStructure(const aiNode* copyFrom, BoneBuffer& bones, uint32_t parent = 0, bool hasParent = false) {
+    uint32_t boneIndex = bones.size();
+    bones.push_back(Bone());
+    Bone& bone = bones.back();
+    
+    bone.mIndex = boneIndex;
+    bone.mHasParent = hasParent;
+    bone.mParentIndex = parent;
+    bone.mName = copyFrom->mName.C_Str();
+
+    bone.mChildren.reserve(copyFrom->mNumChildren);
+    for(uint32_t i = 0; i < copyFrom->mNumChildren; ++ i) {
+        bone.mChildren.push_back(recursiveBuildBoneStructure(copyFrom->mChildren[i], bones, boneIndex, true));
+    }
+    
+    return boneIndex;
+}
+
 void convertGeometry(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
     
-    
-    
     Assimp::Importer assimp;
-    const aiScene* scene;
+    
+    bool paramMeshNameSpecified = false;
+    std::string paramMeshName = "";
+    bool paramPretransform = true;
+    bool paramFlipWinding = false;
+    
+    bool paramLocationsRemove = false;
+    
+    bool paramNormalsRemove = false;
+    
+    bool paramUvsFlip = true;
+    bool paramUvsRemove = false;
+    
+    bool paramTangentsGenerate = false;
+    bool paramTangentsRemove = false;
+    
+    bool paramColorsRemove = false;
+    
+    bool paramBoneWeightsNormalize = false;
+    SkinningTechnique paramBoneWeightsSkinningTechnique = SkinningTechnique::LINEAR_BLEND;
+    
+    bool paramLightprobesEnabled = false;
+    std::string paramLightprobesMeshName = "";
+    bool paramLightprobesBoneWeightsNormalize = false;
+    SkinningTechnique  paramLightprobesBoneWeightSkinningTechnique = SkinningTechnique::LINEAR_BLEND;
+    
+    bool paramArmatureEnabled = false;
+    std::string paramArmatureRootName = "";
+    
+    {
+        {
+            const Json::Value& jsonMeshName = params["mesh-name"];
+            if(jsonMeshName.isString()) {
+                paramMeshNameSpecified = true;
+                paramMeshName = jsonMeshName.asString();
+            }
+        }
+        
+        {
+            const Json::Value& jsonPretransform = params["pretransform"];
+            if(jsonPretransform.isBool()) paramPretransform = jsonPretransform.asBool();
+        }
+        
+        {
+            const Json::Value& jsonLocations = params["locations"];
+            if(!jsonLocations.isNull()) {
+                const Json::Value& jsonRemove = jsonLocations["remove"];
+                if(jsonRemove.isBool()) paramLocationsRemove = jsonRemove.asBool();
+            }
+        }
+        
+        {
+            const Json::Value& jsonNormals = params["normals"];
+            if(!jsonNormals.isNull()) {
+                const Json::Value& jsonRemove = jsonNormals["remove"];
+                if(jsonRemove.isBool()) paramNormalsRemove = jsonRemove.asBool();
+            }
+        }
+        
+        {
+            const Json::Value& jsonUvs = params["uvs"];
+            if(!jsonUvs.isNull()) {
+                const Json::Value& jsonFlip = jsonUvs["flip"];
+                if(jsonFlip.isBool()) paramUvsFlip = jsonFlip.asBool();
+                
+                const Json::Value& jsonRemove = jsonUvs["remove"];
+                if(jsonRemove.isBool()) paramUvsRemove = jsonRemove.asBool();
+            }
+        }
+        
+        {
+            const Json::Value& jsonTangents = params["tangents"];
+            if(!jsonTangents.isNull()) {
+                const Json::Value& jsonGenerate = jsonTangents["generate"];
+                if(jsonGenerate.isBool()) paramTangentsGenerate = jsonGenerate.asBool();
+                
+                const Json::Value& jsonRemove = jsonTangents["remove"];
+                if(jsonRemove.isBool()) paramTangentsRemove = jsonRemove.asBool();
+            }
+        }
+        
+        {
+            const Json::Value& jsonColors = params["colors"];
+            if(!jsonColors.isNull()) {
+                const Json::Value& jsonRemove = jsonColors["remove"];
+                if(jsonRemove.isBool()) paramColorsRemove = jsonRemove.asBool();
+            }
+        }
+        
+        {
+            const Json::Value& jsonBones = params["bone-weights"];
+            if(!jsonBones.isNull()) {
+                const Json::Value& jsonNormalize = jsonBones["normalize"];
+                if(jsonNormalize.isBool()) paramBoneWeightsNormalize = jsonNormalize.asBool();
+                
+                const Json::Value& jsonSkinning = jsonBones["skinning-technique"];
+                if(jsonSkinning.isString()) {
+                    paramBoneWeightsSkinningTechnique = stringToSkinningTechnique(jsonSkinning.asString());
+                    paramLightprobesBoneWeightSkinningTechnique = paramBoneWeightsSkinningTechnique;
+                }
+            }
+        }
+        
+        {
+            const Json::Value& jsonLight = params["lightprobes"];
+            if(!jsonLight.isNull()) {
+                const Json::Value& jsonName = jsonLight["mesh-name"];
+                if(jsonName.isString()) {
+                    paramLightprobesEnabled = true;
+                    paramLightprobesMeshName = jsonName.asString();
+                }
+                
+                const Json::Value& jsonWeights = jsonLight["bone-weights"];
+                if(!jsonWeights.isNull()) {
+                    const Json::Value& jsonNormalize = jsonWeights["normalize"];
+                    if(jsonNormalize.isBool()) paramLightprobesBoneWeightsNormalize = jsonNormalize.asBool();
+                    
+                    const Json::Value& jsonSkinning = jsonWeights["skinning-technique"];
+                    if(jsonSkinning.isString()) paramLightprobesBoneWeightSkinningTechnique = stringToSkinningTechnique(jsonSkinning.asString());
+                        
+                }
+            }
+        }
+        
+        {
+            const Json::Value& jsonArmature = params["armature"];
+            if(!jsonArmature.isNull()) {
+                const Json::Value& jsonRootName = jsonArmature["root-name"];
+                if(jsonRootName.isString()) {
+                    paramArmatureEnabled = true;
+                    paramArmatureRootName = jsonRootName.asString();
+                }
+            }
+        }
+    }
+    
+    
+    const aiScene* aScene;
     {
         unsigned int importFlags = aiProcess_Triangulate;
         
-        const Json::Value& pretransformData = params["pretransform"];
-        if(!pretransformData.isNull()) {
-            if(pretransformData.asBool()) {
-                importFlags |= aiProcess_PreTransformVertices;
-                std::cout << "\tPretransform: true" << std::endl;
-            }
+        if(paramPretransform) {
+            importFlags |= aiProcess_PreTransformVertices;
+            std::cout << "\tPretransforming vertices" << std::endl;
         }
         
-        const Json::Value& uvsData = params["uvs"];
-        if(!uvsData.isNull()) {
-            bool flip = uvsData["flip"].asBool();
-            
-            if(flip) {
-                importFlags |= aiProcess_FlipUVs;
-                std::cout << "\tUVs: flip" << std::endl;
-            }
+        if(paramFlipWinding) {
+            importFlags |= aiProcess_FlipUVs;
+            std::cout << "\tFlipping triangle windings" << std::endl;
         }
         
-        const Json::Value& tangentsData = params["tangents"];
-        if(!tangentsData.isNull()) {
-            bool generate = tangentsData["generate"].asBool();
-            
-            if(generate) {
-                importFlags |= aiProcess_CalcTangentSpace;
-                std::cout << "\tTangents: generate" << std::endl;
-            }
+        if(paramTangentsGenerate) {
+            importFlags |= aiProcess_CalcTangentSpace;
+            std::cout << "\tGenerating tangents and bitangents" << std::endl;
         }
         
-        scene = assimp.ReadFile(fromFile.string().c_str(), importFlags);
+        aScene = assimp.ReadFile(fromFile.string().c_str(), importFlags);
     }
-
+    
+    if(!aScene->HasMeshes()) {
+        std::cout << "\tERROR: Imported scene has no meshes!" << std::endl;
+        return;
+    }
 
     // TODO: support for multiple color and uv channels
 
-    const aiNode* rootNode = scene->mRootNode;
+    const aiNode* rootNode = aScene->mRootNode;
 
-    debugAiNode(scene, rootNode, 1);
+    debugAiNode(aScene, rootNode, 1);
 
-    geo::Mesh mesh;
+    Mesh output;
     
-    const aiNode* aNode = findFirstMeshNode(rootNode);
-
-    const aiMesh* aMesh = scene->mMeshes[aNode->mMeshes[0]];
-
-    mesh.useNormals = aMesh->HasNormals();
-    mesh.usePositions = aMesh->HasPositions();
-    mesh.useTangents = aMesh->HasTangentsAndBitangents();
-    mesh.useBitangents = aMesh->HasTangentsAndBitangents();
-    mesh.useColor = false;
-    for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
-        if(aMesh->HasVertexColors(i)) {
-            mesh.useColor = true;
-            break;
+    const aiMesh* aMesh;
+    const aiNode* aMeshNode;
+    
+    if(paramMeshNameSpecified) {
+        aMeshNode = findNodeByName(rootNode, paramMeshName);
+        if(!aMeshNode) {
+            std::cout << "\tERROR: Could not find mesh node named " << paramMeshName << "!" << std::endl;
+            return;
         }
-    }
-    mesh.useUV = false;
-    for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
-        if(aMesh->HasTextureCoords(i)) {
-            mesh.useUV = true;
-            break;
+        
+        if(aMeshNode->mNumMeshes == 0) {
+            std::cout << "\tERROR: Mesh node named " << paramMeshName << " has no meshes!" << std::endl;
+            return;
         }
+        
+        aMesh = aScene->mMeshes[aMeshNode->mMeshes[0]];
+    } else {
+        aMesh = aScene->mMeshes[0];
+        aMeshNode = nullptr;
     }
 
-    mesh.vertices.reserve(aMesh->mNumVertices);
+    output.mUseNormals = !paramNormalsRemove && aMesh->HasNormals();
+    output.mUseLocations = !paramLocationsRemove && aMesh->HasPositions();
+    output.mUseTangents = !paramTangentsRemove && aMesh->HasTangentsAndBitangents();
+    output.mUseBitangents = !paramTangentsRemove && aMesh->HasTangentsAndBitangents();
+    
+    output.mUseColor = false;
+    if(!paramColorsRemove) {
+        for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
+            if(aMesh->HasVertexColors(i)) {
+                output.mUseColor = true;
+                break;
+            }
+        }
+    }
+    
+    output.mUseUV = false;
+    if(!paramNormalsRemove) {
+        for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
+            if(aMesh->HasTextureCoords(i)) {
+                output.mUseUV = true;
+                break;
+            }
+        }
+    }
+
+    output.mVertices.reserve(aMesh->mNumVertices);
     for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
 
         // Assimp specification states that these arrays are all mNumVertices in size
 
-        geo::Vertex vertex;
+        Vertex vertex;
 
-        if(mesh.usePositions) {
+        if(output.mUseLocations) {
             aiVector3D aPos = aMesh->mVertices[i];
-            //aPos *= aNode->mTransformation;
             vertex.x = aPos.x;
             vertex.y = aPos.y;
             vertex.z = aPos.z;
         }
-        if(mesh.useColor) {
+        if(output.mUseColor) {
             const aiColor4D& aColor = aMesh->mColors[0][i];
             vertex.r = aColor.r;
             vertex.g = aColor.g;
             vertex.b = aColor.b;
             vertex.a = aColor.a;
         }
-        if(mesh.useNormals) {
+        if(output.mUseNormals) {
             aiVector3D aNormal = aMesh->mNormals[i];
-            aiMatrix4x4 transf = aNode->mTransformation;
-            
-            // Simulating w = 0 (aNormal is a direction not a position)
-            transf.a4 = 0.f;
-            transf.b4 = 0.f;
-            transf.c4 = 0.f;
-            transf.d4 = 0.f;
-            
-            //aNormal *= transf;
             vertex.nx = aNormal.x;
             vertex.ny = aNormal.y;
             vertex.nz = aNormal.z;
         }
-        if(mesh.useUV) {
+        if(output.mUseUV) {
             const aiVector3D& aUV = aMesh->mTextureCoords[0][i];
             vertex.u = aUV.x;
             vertex.v = aUV.y;
         }
-        if(mesh.useTangents) {
+        if(output.mUseTangents) {
             aiVector3D aTangent = aMesh->mTangents[i];
-            aiMatrix4x4 transf = aNode->mTransformation;
-            
-            // Simulating w = 0
-            transf.a4 = 0.f;
-            transf.b4 = 0.f;
-            transf.c4 = 0.f;
-            transf.d4 = 0.f;
-            
-            //aTangent *= transf;
             vertex.tx = aTangent.x;
             vertex.ty = aTangent.y;
             vertex.tz = aTangent.z;
         }
-        if(mesh.useBitangents) {
+        if(output.mUseBitangents) {
             aiVector3D aBitangent = aMesh->mBitangents[i];
-            aiMatrix4x4 transf = aNode->mTransformation;
-            
-            // Simulating w = 0
-            transf.a4 = 0.f;
-            transf.b4 = 0.f;
-            transf.c4 = 0.f;
-            transf.d4 = 0.f;
-            
-            //aBitangent *= transf;
             vertex.btx = aBitangent.x;
             vertex.bty = aBitangent.y;
             vertex.btz = aBitangent.z;
         }
 
-        mesh.vertices.push_back(vertex);
+        output.mVertices.push_back(vertex);
     }
 
-    mesh.triangles.reserve(aMesh->mNumFaces);
+    output.mTriangles.reserve(aMesh->mNumFaces);
     for(uint32_t i = 0; i < aMesh->mNumFaces; ++ i) {
         const aiFace& aFace = aMesh->mFaces[i];
 
-        geo::Triangle triangle;
+        Triangle triangle;
         triangle.a = aFace.mIndices[0];
         triangle.b = aFace.mIndices[1];
         triangle.c = aFace.mIndices[2];
 
-        mesh.triangles.push_back(triangle);
+        output.mTriangles.push_back(triangle);
+    }
+    
+    if(paramArmatureEnabled) {
+        const aiNode* aArmRoot = findNodeByName(aScene->mRootNode, paramArmatureRootName);
+        
+        if(aArmRoot) {
+            uint32_t numBones = findNodeTreeSize(aArmRoot);
+            
+            if(numBones < 256) {
+                std::cout << "Armature bone count: " << numBones << std::endl;
+                
+                output.mBones.reserve(numBones);
+                recursiveBuildBoneStructure(aArmRoot, output.mBones);
+            }
+            else {
+                std::cout << "\tERROR: Armature bone count (" << numBones << ") exceeds max (255)" << std::endl;
+            }
+        }
+        else {
+            std::cout << "\tERROR: Could not find armature root by name " << paramArmatureRootName << std::endl;
+        }
     }
 
-    std::cout << "\tVertices: " << mesh.vertices.size() << std::endl;
-    std::cout << "\tTriangles: " << mesh.triangles.size() << std::endl;
+    std::cout << "\tVertices: " << output.mVertices.size() << std::endl;
+    std::cout << "\tTriangles: " << output.mTriangles.size() << std::endl;
 
     {
         std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
 
-        writeBool(outputData, mesh.usePositions);
-        writeBool(outputData, mesh.useColor);
-        writeBool(outputData, mesh.useUV);
-        writeBool(outputData, mesh.useNormals);
-        writeBool(outputData, mesh.useTangents);
-        writeBool(outputData, mesh.useBitangents);
-        writeU32(outputData, mesh.vertices.size());
-        writeU32(outputData, mesh.triangles.size());
-        for(geo::VertexBuffer::iterator iter = mesh.vertices.begin(); iter != mesh.vertices.end(); ++ iter) {
-            const geo::Vertex& vertex = *iter;
+        writeBool(outputData, output.mUseLocations);
+        writeBool(outputData, output.mUseColor);
+        writeBool(outputData, output.mUseUV);
+        writeBool(outputData, output.mUseNormals);
+        writeBool(outputData, output.mUseTangents);
+        writeBool(outputData, output.mUseBitangents);
+        writeU32(outputData, output.mVertices.size());
+        writeU32(outputData, output.mTriangles.size());
+        for(VertexBuffer::iterator iter = output.mVertices.begin(); iter != output.mVertices.end(); ++ iter) {
+            const Vertex& vertex = *iter;
 
-            if(mesh.usePositions) {
+            if(output.mUseLocations) {
                 writeF32(outputData, vertex.x);
                 writeF32(outputData, vertex.y);
                 writeF32(outputData, vertex.z);
             }
-            if(mesh.useColor) {
+            if(output.mUseColor) {
                 writeF32(outputData, vertex.r);
                 writeF32(outputData, vertex.g);
                 writeF32(outputData, vertex.b);
                 writeF32(outputData, vertex.a);
             }
-            if(mesh.useUV) {
+            if(output.mUseUV) {
                 writeF32(outputData, vertex.u);
                 writeF32(outputData, vertex.v);
             }
-            if(mesh.useNormals) {
+            if(output.mUseNormals) {
                 writeF32(outputData, vertex.nx);
                 writeF32(outputData, vertex.ny);
                 writeF32(outputData, vertex.nz);
             }
-            if(mesh.useTangents) {
+            if(output.mUseTangents) {
                 writeF32(outputData, vertex.tx);
                 writeF32(outputData, vertex.ty);
                 writeF32(outputData, vertex.tz);
             }
-            if(mesh.useBitangents) {
+            if(output.mUseBitangents) {
                 writeF32(outputData, vertex.btx);
                 writeF32(outputData, vertex.bty);
                 writeF32(outputData, vertex.btz);
             }
         }
-        for(geo::TriangleBuffer::iterator iter = mesh.triangles.begin(); iter != mesh.triangles.end(); ++ iter) {
-            const geo::Triangle& triangle = *iter;
+        for(TriangleBuffer::iterator iter = output.mTriangles.begin(); iter != output.mTriangles.end(); ++ iter) {
+            const Triangle& triangle = *iter;
 
             writeU32(outputData, triangle.a);
             writeU32(outputData, triangle.b);
