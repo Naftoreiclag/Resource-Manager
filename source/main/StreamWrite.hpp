@@ -5,15 +5,15 @@
 #include <string>
 #include <stdint.h>
 
-void writeU32(std::ofstream& output, const uint32_t& value);
+void writeU32(std::ofstream& output, uint32_t value);
 
-void writeBool(std::ofstream& output, const bool& value);
+void writeU16(std::ofstream& output, uint16_t value);
 
-void writeU16(std::ofstream& output, const uint16_t& value);
+void writeU8(std::ofstream& output, uint8_t value);
 
-void writeU8(std::ofstream& output, const uint8_t& value);
+void writeBool(std::ofstream& output, bool value);
 
-void writeF32(std::ofstream& output, const float& value);
+void writeF32(std::ofstream& output, float value);
 
 void writeString(std::ofstream& output, const std::string& value);
 
