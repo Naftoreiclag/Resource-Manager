@@ -149,6 +149,10 @@ struct Triangle {
     uint32_t c;
 };
 
+struct Lightprobe {
+    
+};
+
 struct Bone {
     uint32_t mIndex;
     uint32_t mParentIndex;
@@ -166,11 +170,13 @@ struct Bone {
 
 typedef std::vector<Vertex> VertexBuffer;
 typedef std::vector<Triangle> TriangleBuffer;
+typedef std::vector<Lightprobe> LightprobeBuffer;
 typedef std::vector<Bone> BoneBuffer;
 
 struct Mesh {
     VertexBuffer mVertices;
     TriangleBuffer mTriangles;
+    LightprobeBuffer mLightprobes;
     BoneBuffer mBones;
 
     bool mUseColor;
@@ -180,8 +186,6 @@ struct Mesh {
     bool mUseTangents;
     bool mUseBitangents;
     bool mUseBoneWeights;
-    
-    
 };
 
 enum SkinningTechnique {
@@ -236,7 +240,8 @@ uint32_t recursiveBuildBoneStructure(const aiNode* copyFrom, BoneBuffer& bones, 
 }
 
 void convertGeometry(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
-    
+    // Importer must be kept alive.
+    // Importer destroys imported data upon destruction.
     Assimp::Importer assimp;
     
     bool paramMeshNameSpecified = false;
@@ -393,8 +398,13 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             std::cout << "\tPretransforming vertices" << std::endl;
         }
         
-        if(paramFlipWinding) {
+        if(paramUvsFlip) {
             importFlags |= aiProcess_FlipUVs;
+            std::cout << "\tFlipping UVs" << std::endl;
+        }
+        
+        if(paramFlipWinding) {
+            importFlags |= aiProcess_FlipWindingOrder;
             std::cout << "\tFlipping triangle windings" << std::endl;
         }
         
@@ -457,7 +467,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     }
     
     output.mUseUV = false;
-    if(!paramNormalsRemove) {
+    if(!paramUvsRemove) {
         for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
             if(aMesh->HasTextureCoords(i)) {
                 output.mUseUV = true;
