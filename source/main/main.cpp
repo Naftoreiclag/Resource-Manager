@@ -102,7 +102,7 @@ enum ObjectType {
 // If this returns true, then all files of this type will be re-converted.
 // This is useful for debugging WIP converters.
 bool isWorkInProgressType(const ObjectType& type) {
-    return false;//type == WAVEFORM;
+    return false;//type == GEOMETRY;
 }
 
 void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
@@ -222,6 +222,8 @@ public:
         uint32_t mOriginalSize;
         uint32_t mOriginalHash;
         bool mSkipTranslate = false;
+        
+        bool mAlwaysRetranslate = false;
 
         //
         boost::filesystem::path mOutputFile;
@@ -241,6 +243,7 @@ public:
         object.mDebugOrigin = objectFile;
         object.mName = objectData["name"].asString();
         object.mType = stringToType(objectData["type"].asString());
+        object.mAlwaysRetranslate = objectData["always-retranslate"].asBool();
         object.mParams = objectData["parameters"];
         if(object.mType == OTHER) {
             std::cout << "Warning! Unknown resource type " << objectData["type"].asString() << " found in resource " << object.mName << " found at " << object.mDebugOrigin << std::endl;
@@ -525,6 +528,10 @@ public:
             for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
 
                 Object& object = *iter;
+                
+                if(object.mAlwaysRetranslate) {
+                    continue;
+                }
 
                 std::ifstream sizeTest(object.mFile.string().c_str(), std::ios::binary | std::ios::ate);
                 object.mOriginalSize = sizeTest.tellg();
@@ -569,6 +576,10 @@ public:
                      */
 
                     Object& object = *iter;
+                    
+                    if(object.mAlwaysRetranslate) {
+                        continue;
+                    }
 
                     for(Json::Value::const_iterator meta = metadataList.begin(); meta != metadataList.end(); ++ meta) {
                         const Json::Value& metadata = *meta;
@@ -619,6 +630,7 @@ public:
 
             uint64_t totalSize = 0;
             uint32_t numUpdates = 0;
+            uint32_t numFails = 0;
 
             // Append the file provided by user
             Json::Value outputPackageData = mPackageJson;
@@ -633,38 +645,51 @@ public:
                 }
 
                 if(!object.mSkipTranslate || isWorkInProgressType(object.mType)) {
-                    std::cout << "\tTranslating..." << std::endl;
+                    std::cout << "\t->";
+                    
+                    // If verbose output is enabled, then the object name has already been printed
+                    if(!outputVerbose) {
+                        std::cout << " " << object.mName << " [" << typeToString(object.mType) << "]";
+                    }
+                    std::cout << "..." << std::endl;
+
                     if(isWorkInProgressType(object.mType)) {
                         std::cout << "\t(WIP)" << std::endl;
                     }
                     translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !obfuscate);
-                    ++ numUpdates;
+                    
+                    if(boost::filesystem::exists(object.mOutputFile)) {
+                        ++ numUpdates;
+                        if(useIntermediate) {
+                            Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];
 
-                    if(useIntermediate) {
-                        Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];
+                            objectMetadata["hash"] = (Json::Int64) (object.mOriginalHash);
+                            objectMetadata["type"] = typeToString(object.mType);
+                            objectMetadata["params"] = object.mParams;
 
-                        objectMetadata["hash"] = (Json::Int64) (object.mOriginalHash);
-                        objectMetadata["type"] = typeToString(object.mType);
-                        objectMetadata["params"] = object.mParams;
+                            std::stringstream ss;
+                            ss << object.mName;
+                            ss << typeToString(object.mType);
+                            ss << "-";
+                            ss << ((uint32_t) (object.mOriginalHash));
+                            ss << ".i";
+                            std::string intermFilename = ss.str();
 
-                        std::stringstream ss;
-                        ss << object.mName;
-                        ss << typeToString(object.mType);
-                        ss << "-";
-                        ss << ((uint32_t) (object.mOriginalHash));
-                        ss << ".i";
-                        std::string intermFilename = ss.str();
+                            objectMetadata["file"] = intermFilename;
 
-                        objectMetadata["file"] = intermFilename;
+                            // copy file
+                            boost::filesystem::path copyTo = intermediateDir / intermFilename;
+                            if(boost::filesystem::exists(copyTo)) {
+                                boost::filesystem::remove(copyTo);
+                            }
+                            boost::filesystem::copy(object.mOutputFile, copyTo);
 
-                        // copy file
-                        boost::filesystem::path copyTo = intermediateDir / intermFilename;
-                        if(boost::filesystem::exists(copyTo)) {
-                            boost::filesystem::remove(copyTo);
+                            ++ metadataIndex;
                         }
-                        boost::filesystem::copy(object.mOutputFile, copyTo);
-
-                        ++ metadataIndex;
+                    }
+                    else {
+                        ++ numFails;
+                        std::cout << "ERROR: " << object.mName << " failed to translate!" << std::endl;
                     }
                 }
                 //
@@ -680,6 +705,7 @@ public:
             }
             std::cout << std::endl;
             std::cout << numUpdates << " file(s) translated" << std::endl;
+            std::cout << numFails << " file(s) failed" << std::endl;
             std::cout << std::endl;
 
             if(useIntermediate) {

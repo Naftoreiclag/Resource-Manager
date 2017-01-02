@@ -18,32 +18,31 @@ void debugAiNode(const aiScene* scene, const aiNode* node, unsigned int depth) {
         std::cout << "\t";
     }
 
-    std::cout << node->mName.C_Str();
+    std::cout << "[" << node->mName.C_Str() << "]";
 
     // Matrix
     if(!node->mTransformation.IsIdentity()) {
-        std::cout << " (transformed)";
+        std::cout << "(T)"; // "T" = "transformed"
     }
     
     unsigned int numMeshes = node->mNumMeshes;
 
-
     if(numMeshes > 0) {
-        std::cout << " ";
+        std::cout << ":";
         std::cout << numMeshes;
-        std::cout << ":[";
+        std::cout << "{";
         for(unsigned int i = 0; i < numMeshes; ++ i) {
 
             aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 
-            std::cout << mesh->mName.C_Str();
+            std::cout << "[" << mesh->mName.C_Str() << "]";
 
             // Nice commas
             if(i != numMeshes - 1) {
                 std::cout << ", ";
             }
         }
-        std::cout << "]";
+        std::cout << "}";
 
     }
     std::cout << std::endl;
@@ -189,9 +188,9 @@ struct Mesh {
 };
 
 enum SkinningTechnique {
-    LINEAR_BLEND,
-    DUAL_QUAT,
-    IMPLICIT
+    LINEAR_BLEND = 0,
+    DUAL_QUAT = 1,
+    IMPLICIT = 2
 };
 
 SkinningTechnique stringToSkinningTechnique(std::string skinning) {
@@ -206,6 +205,10 @@ SkinningTechnique stringToSkinningTechnique(std::string skinning) {
     }
     
     return SkinningTechnique::LINEAR_BLEND;
+}
+
+uint8_t skinningTechniqueToByte(SkinningTechnique st) {
+    return (uint8_t) st;
 }
 
 
@@ -251,9 +254,11 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     
     bool paramLocationsRemove = false;
     
+    bool paramNormalsGenerate = false;
     bool paramNormalsRemove = false;
     
     bool paramUvsFlip = true;
+    bool paramUvsGenerate = false;
     bool paramUvsRemove = false;
     
     bool paramTangentsGenerate = false;
@@ -275,6 +280,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     bool paramArmatureEnabled = false;
     std::string paramArmatureRootName = "";
     
+    // Read from json configuration
     {
         {
             const Json::Value& jsonMeshName = params["mesh-name"];
@@ -300,6 +306,9 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         {
             const Json::Value& jsonNormals = params["normals"];
             if(!jsonNormals.isNull()) {
+                const Json::Value& jsonGenerate = jsonNormals["generate"];
+                if(jsonGenerate.isBool()) paramNormalsGenerate = jsonGenerate.asBool();
+                
                 const Json::Value& jsonRemove = jsonNormals["remove"];
                 if(jsonRemove.isBool()) paramNormalsRemove = jsonRemove.asBool();
             }
@@ -310,6 +319,9 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             if(!jsonUvs.isNull()) {
                 const Json::Value& jsonFlip = jsonUvs["flip"];
                 if(jsonFlip.isBool()) paramUvsFlip = jsonFlip.asBool();
+                
+                const Json::Value& jsonGenerate = jsonUvs["generate"];
+                if(jsonGenerate.isBool()) paramUvsGenerate = jsonGenerate.asBool();
                 
                 const Json::Value& jsonRemove = jsonUvs["remove"];
                 if(jsonRemove.isBool()) paramUvsRemove = jsonRemove.asBool();
@@ -389,9 +401,27 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     }
     
     
+    // Import scene
     const aiScene* aScene;
     {
         unsigned int importFlags = aiProcess_Triangulate;
+        
+        
+        if(paramNormalsGenerate) {
+            importFlags |= aiProcess_GenSmoothNormals;
+            std::cout << "\tGenerating normals" << std::endl;
+        }
+        
+        if(paramUvsGenerate) {
+            importFlags |= aiProcess_GenUVCoords;
+            std::cout << "\tGenerating UVs" << std::endl;
+        }
+        
+        if(paramTangentsGenerate) {
+            importFlags |= aiProcess_CalcTangentSpace;
+            std::cout << "\tGenerating tangents and bitangents" << std::endl;
+        }
+        
         
         if(paramPretransform) {
             importFlags |= aiProcess_PreTransformVertices;
@@ -408,11 +438,6 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             std::cout << "\tFlipping triangle windings" << std::endl;
         }
         
-        if(paramTangentsGenerate) {
-            importFlags |= aiProcess_CalcTangentSpace;
-            std::cout << "\tGenerating tangents and bitangents" << std::endl;
-        }
-        
         aScene = assimp.ReadFile(fromFile.string().c_str(), importFlags);
     }
     
@@ -423,9 +448,10 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
 
     // TODO: support for multiple color and uv channels
 
-    const aiNode* rootNode = aScene->mRootNode;
+    const aiNode* aRootNode = aScene->mRootNode;
 
-    debugAiNode(aScene, rootNode, 1);
+    // Display recursive debug information
+    debugAiNode(aScene, aRootNode, 1);
 
     Mesh output;
     
@@ -433,7 +459,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     const aiNode* aMeshNode;
     
     if(paramMeshNameSpecified) {
-        aMeshNode = findNodeByName(rootNode, paramMeshName);
+        aMeshNode = findNodeByName(aRootNode, paramMeshName);
         if(!aMeshNode) {
             std::cout << "\tERROR: Could not find mesh node named " << paramMeshName << "!" << std::endl;
             return;
@@ -670,7 +696,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
 
         // Per-vertex data bit flags
         writeU8(outputData,
-            output.mUseLocations << 0 |
+            output.mUseLocations |
             output.mUseColor << 1 |
             output.mUseUV << 2 |
             output.mUseNormals << 3 |
@@ -678,7 +704,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             output.mUseBitangents << 5 |
             output.mUseBoneWeights << 6
         );
-        
+        writeU8(outputData, skinningTechniqueToByte(paramBoneWeightsSkinningTechnique));
         writeU32(outputData, output.mVertices.size());
         for(Vertex& vertex : output.mVertices) {
             // Every vertex has a fixed size in bytes, allowing for "random access" of vertices if necessary
@@ -735,6 +761,14 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             writeU32(outputData, triangle.a);
             writeU32(outputData, triangle.b);
             writeU32(outputData, triangle.c);
+        }
+                
+        
+        writeU8(outputData, skinningTechniqueToByte(paramLightprobesBoneWeightSkinningTechnique));
+        writeU32(outputData, output.mLightprobes.size());
+        for(Lightprobe& lightprobe : output.mLightprobes) {
+            // Lightprobes are also fixed in size
+            
         }
         
         assert(output.mBones.size() <= 256);
