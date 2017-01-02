@@ -86,8 +86,15 @@ uint32_t findNodeTreeSize(const aiNode* node) {
     return sum;
 }
 
+struct BoneWeight {
+    uint8_t id;
+    float weight;
+};
+typedef std::vector<BoneWeight> BoneWeightBuffer;
     
 struct Vertex {
+    uint32_t mIndex;
+    
     // Position
     float x;
     float y;
@@ -117,6 +124,9 @@ struct Vertex {
     float btx;
     float bty;
     float btz;
+    
+    // Bone weights
+    BoneWeightBuffer mBoneWeights;
 
     Vertex()
     : x(0.f)
@@ -247,11 +257,14 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     bool paramColorsRemove = false;
     
     bool paramBoneWeightsNormalize = false;
+    double paramBoneWeightsAbsMinWeight = 0.0;
     SkinningTechnique paramBoneWeightsSkinningTechnique = SkinningTechnique::LINEAR_BLEND;
+    bool paramBoneWeightsRemove = false;
     
     bool paramLightprobesEnabled = false;
     std::string paramLightprobesMeshName = "";
     bool paramLightprobesBoneWeightsNormalize = false;
+    double paramLightprobesBoneWeightsAbsMinWeight = 0.0;
     SkinningTechnique  paramLightprobesBoneWeightSkinningTechnique = SkinningTechnique::LINEAR_BLEND;
     
     bool paramArmatureEnabled = false;
@@ -323,11 +336,17 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
                 const Json::Value& jsonNormalize = jsonBones["normalize"];
                 if(jsonNormalize.isBool()) paramBoneWeightsNormalize = jsonNormalize.asBool();
                 
+                const Json::Value& jsonAbsMin = jsonBones["absolute-minimum-weight"];
+                if(jsonAbsMin.isNumeric()) paramBoneWeightsAbsMinWeight = jsonAbsMin.asDouble();
+                
                 const Json::Value& jsonSkinning = jsonBones["skinning-technique"];
                 if(jsonSkinning.isString()) {
                     paramBoneWeightsSkinningTechnique = stringToSkinningTechnique(jsonSkinning.asString());
                     paramLightprobesBoneWeightSkinningTechnique = paramBoneWeightsSkinningTechnique;
                 }
+                
+                const Json::Value& jsonRemove = jsonBones["remove"];
+                if(jsonRemove.isBool()) paramBoneWeightsRemove = jsonRemove.asBool();
             }
         }
         
@@ -425,6 +444,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     output.mUseLocations = !paramLocationsRemove && aMesh->HasPositions();
     output.mUseTangents = !paramTangentsRemove && aMesh->HasTangentsAndBitangents();
     output.mUseBitangents = !paramTangentsRemove && aMesh->HasTangentsAndBitangents();
+    output.mUseBoneWeights = !paramBoneWeightsRemove && aMesh->HasBones();
     
     output.mUseColor = false;
     if(!paramColorsRemove) {
@@ -445,13 +465,15 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             }
         }
     }
-
+    
     output.mVertices.reserve(aMesh->mNumVertices);
     for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
 
         // Assimp specification states that these arrays are all mNumVertices in size
 
         Vertex vertex;
+        
+        vertex.mIndex = i;
 
         if(output.mUseLocations) {
             aiVector3D aPos = aMesh->mVertices[i];
@@ -504,21 +526,21 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
 
         output.mTriangles.push_back(triangle);
     }
-    
+
     if(paramArmatureEnabled) {
         const aiNode* aArmRoot = findNodeByName(aScene->mRootNode, paramArmatureRootName);
         
         if(aArmRoot) {
             uint32_t numBones = findNodeTreeSize(aArmRoot);
             
-            if(numBones < 256) {
+            if(numBones > 256) {
+                std::cout << "\tERROR: Armature bone count (" << numBones << ") exceeds max (256)" << std::endl;
+            }
+            else {
                 std::cout << "Armature bone count: " << numBones << std::endl;
                 
                 output.mBones.reserve(numBones);
                 recursiveBuildBoneStructure(aArmRoot, output.mBones);
-            }
-            else {
-                std::cout << "\tERROR: Armature bone count (" << numBones << ") exceeds max (255)" << std::endl;
             }
         }
         else {
@@ -526,23 +548,131 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         }
     }
 
+    if(output.mUseBoneWeights) {
+        for(uint32_t iBone = 0; iBone < aMesh->mNumBones; ++ iBone) {
+            const aiBone* aBone = aMesh->mBones[iBone];
+            // Each aiBone is really more of a pointer into the bone array by name..?
+            
+            // Find the index of the appropriate bone
+            std::string boneName = aBone->mName.C_Str();
+            uint8_t boneIndex;
+            for(boneIndex = 0; boneIndex < output.mBones.size(); ++ boneIndex) {
+                const Bone& bone = output.mBones.at(boneIndex);
+                if(bone.mName == boneName) {
+                    break;
+                }
+            }
+            if(boneIndex == output.mBones.size()) {
+                std::cout << "\tERROR: Could not find bone named: " << boneName << std::endl;
+            } else {
+                for(uint32_t iWeight = 0; iWeight < aBone->mNumWeights; ++ iWeight) {
+                    const aiVertexWeight& aWeight = aBone->mWeights[iWeight];
+                    Vertex& vert = output.mVertices.at(aWeight.mVertexId);
+                    BoneWeight weight;
+                    weight.id = boneIndex;
+                    weight.weight = aWeight.mWeight;
+                    vert.mBoneWeights.push_back(weight);
+                }
+            }
+        }
+        
+        // Sort bone weights by influence (descending order)
+        // Normalize if requested
+        for(Vertex& vertex : output.mVertices) {
+            
+            BoneWeightBuffer& boneWeights = vertex.mBoneWeights;
+            
+            // Skip procesing on any vertex not affected by bones
+            if(boneWeights.size() > 0) {
+                // Exclude any weights that are less than the given minimum
+                if(paramBoneWeightsAbsMinWeight > 0.0) {
+                    boneWeights.erase(std::remove_if(
+                        boneWeights.begin(), boneWeights.end(),
+                        [paramBoneWeightsAbsMinWeight](const BoneWeight& bw) -> bool {
+                            if(bw.weight < 0.0) {
+                                return -bw.weight < paramBoneWeightsAbsMinWeight;
+                            } else {
+                                return bw.weight < paramBoneWeightsAbsMinWeight;
+                            }
+                        }
+                    ), boneWeights.end());
+                }
+                
+                // Sort bone weights
+                std::sort(boneWeights.begin(), boneWeights.end(),
+                    [](const BoneWeight& a, const BoneWeight& b) {
+                        // Sort by descending order of weight, unless the weights are equal.
+                        // In that case sort by ascending id's
+                        return (a.weight == b.weight) ? (a.id < b.id) : (a.weight > b.weight);
+                    }
+                );
+                    
+                // Make sure that maximum influence count does not exceed maximum
+                if(boneWeights.size() > 4) {
+                    std::cout << "\tWARNING: Vertex " << vertex.mIndex << " has " << boneWeights.size() << " > 4 bones" << std::endl;
+                    
+                    // Restore original total weight (unless normalization is specified, in which case the total weight is 1)
+                    if(!paramBoneWeightsNormalize) {
+                        double lostWeight = 0.0;
+                        uint32_t index = 0;
+                        for(BoneWeight bw : boneWeights) {
+                            if(index >= 4) lostWeight += bw.weight;
+                            ++ index;
+                        }
+                        boneWeights.resize(4);
+                        lostWeight /= 4.0;
+                        for(BoneWeight& bw : boneWeights) {
+                            bw.weight += lostWeight;
+                        }
+                    } else {
+                        boneWeights.resize(4);
+                    }
+                }
+                
+                // Normalization if requested (sets the total weight for the bones to be one)
+                if(paramBoneWeightsNormalize) {
+                    double totalWeight = 0.0;
+                    for(BoneWeight bw : boneWeights) {
+                        totalWeight += bw.weight;
+                    }
+                    
+                    // Avoid division by zero
+                    if(totalWeight > 0.0) {
+                        for(BoneWeight bw : boneWeights) {
+                            bw.weight /= totalWeight;
+                        }
+                    } else {
+                        // Just set the first bone to have maximum influence
+                        // Note that bones with exactly zero bone influences are already excluded
+                        boneWeights.at(0).weight = 1.0;
+                    }
+                }
+            }
+        }
+    }
+    
     std::cout << "\tVertices: " << output.mVertices.size() << std::endl;
     std::cout << "\tTriangles: " << output.mTriangles.size() << std::endl;
+    std::cout << "\tBones: " << output.mBones.size() << std::endl;
 
     {
         std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
 
-        writeBool(outputData, output.mUseLocations);
-        writeBool(outputData, output.mUseColor);
-        writeBool(outputData, output.mUseUV);
-        writeBool(outputData, output.mUseNormals);
-        writeBool(outputData, output.mUseTangents);
-        writeBool(outputData, output.mUseBitangents);
+        // Per-vertex data bit flags
+        writeU8(outputData,
+            output.mUseLocations << 0 |
+            output.mUseColor << 1 |
+            output.mUseUV << 2 |
+            output.mUseNormals << 3 |
+            output.mUseTangents << 4 |
+            output.mUseBitangents << 5 |
+            output.mUseBoneWeights << 6
+        );
+        
         writeU32(outputData, output.mVertices.size());
-        writeU32(outputData, output.mTriangles.size());
-        for(VertexBuffer::iterator iter = output.mVertices.begin(); iter != output.mVertices.end(); ++ iter) {
-            const Vertex& vertex = *iter;
-
+        for(Vertex& vertex : output.mVertices) {
+            // Every vertex has a fixed size in bytes, allowing for "random access" of vertices if necessary
+            
             if(output.mUseLocations) {
                 writeF32(outputData, vertex.x);
                 writeF32(outputData, vertex.y);
@@ -573,13 +703,46 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
                 writeF32(outputData, vertex.bty);
                 writeF32(outputData, vertex.btz);
             }
+            if(output.mUseBoneWeights) {
+                uint32_t bonesOutputted = 0;
+                for(BoneWeight bw : vertex.mBoneWeights) {
+                    writeU8(outputData, bw.id);
+                    writeF32(outputData, bw.weight);
+                    ++ bonesOutputted;
+                }
+                assert(bonesOutputted <= 4);
+                while(bonesOutputted < 4) {
+                    writeU8(outputData, 0);
+                    writeF32(outputData, 0.f);
+                    ++ bonesOutputted;
+                }
+            }
         }
-        for(TriangleBuffer::iterator iter = output.mTriangles.begin(); iter != output.mTriangles.end(); ++ iter) {
-            const Triangle& triangle = *iter;
-
+        writeU32(outputData, output.mTriangles.size());
+        for(Triangle& triangle : output.mTriangles) {
+            // Triangles are also fixed in size
+            
             writeU32(outputData, triangle.a);
             writeU32(outputData, triangle.b);
             writeU32(outputData, triangle.c);
+        }
+        
+        assert(output.mBones.size() <= 256);
+        
+        writeU8(outputData, output.mBones.size());
+        for(Bone& bone : output.mBones) {
+            // Bones are not fixed in size, because of the varying size of bone names
+            
+            writeString(outputData, bone.mName);
+            writeBool(outputData, bone.mHasParent);
+            if(bone.mHasParent) {
+                writeU8(outputData, bone.mParentIndex);
+            }
+            
+            writeU8(outputData, bone.mChildren.size());
+            for(uint32_t child : bone.mChildren) {
+                writeU8(outputData, child);
+            }
         }
 
         outputData.close();
