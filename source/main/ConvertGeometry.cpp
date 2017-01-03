@@ -264,125 +264,135 @@ uint8_t skinningTechniqueToByte(SkinningTechnique st) {
 }
 
 inline void writeBoneBuffer(std::ofstream& outputData, const BoneWeightBuffer& boneBuffer) {
-    uint32_t bonesOutputted = 0;
-    for(const BoneWeight bw : boneBuffer) {
-        writeU8(outputData, bw.id);
-        writeF32(outputData, bw.weight);
-        ++ bonesOutputted;
-    }
-    assert(bonesOutputted <= 4);
-    while(bonesOutputted < 4) {
-        writeU8(outputData, 0);
-        writeF32(outputData, 0.f);
-        ++ bonesOutputted;
-    }
+    assert(boneBuffer.size() <= 4);
+    uint16_t missingBones = 4 - boneBuffer.size();
+    for(const BoneWeight bw : boneBuffer) writeU8(outputData, bw.id);
+    for(uint16_t i = 0; i < missingBones; ++ i) writeU8(outputData, 0);
+    for(const BoneWeight bw : boneBuffer) writeF32(outputData, bw.weight);
+    for(uint16_t i = 0; i < missingBones; ++ i) writeF32(outputData, 0.f);
 }
 
 void outputMesh(Mesh& output, const boost::filesystem::path& outputFile) {
     std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
-
-    // Per-vertex data bit flags
+    
+    // Exist flags
+    bool useVertices = true;
+    bool useTriangles = true;
+    bool useBones = output.mBones.size() > 0;
+    bool useLightprobes = output.mLightprobes.size() > 0;
     writeU8(outputData,
-        output.mUseLocations |
-        output.mUseColor << 1 |
-        output.mUseUV << 2 |
-        output.mUseNormals << 3 |
-        output.mUseTangents << 4 |
-        output.mUseBitangents << 5 |
-        output.mUseBoneWeights << 6
+        useVertices |
+        useTriangles << 1 |
+        useBones << 2 |
+        useLightprobes << 3
     );
-    writeU8(outputData, skinningTechniqueToByte(output.mLightprobeSkinning));
-    writeU32(outputData, output.mVertices.size());
-    for(Vertex& vertex : output.mVertices) {
-        // Every vertex has a fixed size in bytes, allowing for "random access" of vertices if necessary
-        
-        if(output.mUseLocations) {
-            writeF32(outputData, vertex.x);
-            writeF32(outputData, vertex.y);
-            writeF32(outputData, vertex.z);
-        }
-        if(output.mUseColor) {
-            writeF32(outputData, vertex.r);
-            writeF32(outputData, vertex.g);
-            writeF32(outputData, vertex.b);
-            writeF32(outputData, vertex.a);
-        }
-        if(output.mUseUV) {
-            writeF32(outputData, vertex.u);
-            writeF32(outputData, vertex.v);
-        }
-        if(output.mUseNormals) {
-            writeF32(outputData, vertex.nx);
-            writeF32(outputData, vertex.ny);
-            writeF32(outputData, vertex.nz);
-        }
-        if(output.mUseTangents) {
-            writeF32(outputData, vertex.tx);
-            writeF32(outputData, vertex.ty);
-            writeF32(outputData, vertex.tz);
-        }
-        if(output.mUseBitangents) {
-            writeF32(outputData, vertex.btx);
-            writeF32(outputData, vertex.bty);
-            writeF32(outputData, vertex.btz);
-        }
-        if(output.mUseBoneWeights) {
-            writeBoneBuffer(outputData, vertex.mBoneWeights);
+    
+    if(useVertices) {
+        // Per-vertex data bit flags
+        writeU8(outputData,
+            output.mUseLocations |
+            output.mUseColor << 1 |
+            output.mUseUV << 2 |
+            output.mUseNormals << 3 |
+            output.mUseTangents << 4 |
+            output.mUseBitangents << 5 |
+            output.mUseBoneWeights << 6
+        );
+        writeU8(outputData, skinningTechniqueToByte(output.mLightprobeSkinning));
+        writeU32(outputData, output.mVertices.size());
+        for(Vertex& vertex : output.mVertices) {
+            // Every vertex has a fixed size in bytes, allowing for "random access" of vertices if necessary
+            
+            if(output.mUseLocations) {
+                writeF32(outputData, vertex.x);
+                writeF32(outputData, vertex.y);
+                writeF32(outputData, vertex.z);
+            }
+            if(output.mUseColor) {
+                writeF32(outputData, vertex.r);
+                writeF32(outputData, vertex.g);
+                writeF32(outputData, vertex.b);
+                writeF32(outputData, vertex.a);
+            }
+            if(output.mUseUV) {
+                writeF32(outputData, vertex.u);
+                writeF32(outputData, vertex.v);
+            }
+            if(output.mUseNormals) {
+                writeF32(outputData, vertex.nx);
+                writeF32(outputData, vertex.ny);
+                writeF32(outputData, vertex.nz);
+            }
+            if(output.mUseTangents) {
+                writeF32(outputData, vertex.tx);
+                writeF32(outputData, vertex.ty);
+                writeF32(outputData, vertex.tz);
+            }
+            if(output.mUseBitangents) {
+                writeF32(outputData, vertex.btx);
+                writeF32(outputData, vertex.bty);
+                writeF32(outputData, vertex.btz);
+            }
+            if(output.mUseBoneWeights) {
+                writeBoneBuffer(outputData, vertex.mBoneWeights);
+            }
         }
     }
     
-    writeU32(outputData, output.mTriangles.size());
-    if(output.mVertices.size() <= 1 << 8) {
-        for(Triangle& triangle : output.mTriangles) {
-            writeU8(outputData, (uint8_t) triangle.a);
-            writeU8(outputData, (uint8_t) triangle.b);
-            writeU8(outputData, (uint8_t) triangle.c);
+    if(useTriangles) {
+        writeU32(outputData, output.mTriangles.size());
+        if(output.mVertices.size() <= 1 << 8) {
+            for(Triangle& triangle : output.mTriangles) {
+                writeU8(outputData, (uint8_t) triangle.a);
+                writeU8(outputData, (uint8_t) triangle.b);
+                writeU8(outputData, (uint8_t) triangle.c);
+            }
         }
-    }
-    else if(output.mVertices.size() <= 1 << 16) {
-        for(Triangle& triangle : output.mTriangles) {
-            writeU16(outputData, (uint16_t) triangle.a);
-            writeU16(outputData, (uint16_t) triangle.b);
-            writeU16(outputData, (uint16_t) triangle.c);
+        else if(output.mVertices.size() <= 1 << 16) {
+            for(Triangle& triangle : output.mTriangles) {
+                writeU16(outputData, (uint16_t) triangle.a);
+                writeU16(outputData, (uint16_t) triangle.b);
+                writeU16(outputData, (uint16_t) triangle.c);
+            }
         }
-    }
-    else {
-        for(Triangle& triangle : output.mTriangles) {
-            writeU32(outputData, (uint32_t) triangle.a);
-            writeU32(outputData, (uint32_t) triangle.b);
-            writeU32(outputData, (uint32_t) triangle.c);
-        }
-    }
-    
-    assert(output.mBones.size() <= 256);
-    writeU8(outputData, output.mBones.size());
-    for(Bone& bone : output.mBones) {
-        // Bones are not fixed in size:
-        // - Varying length of bone names
-        // - Varying length of child array
-        
-        writeString(outputData, bone.mName);
-        writeBool(outputData, bone.mHasParent);
-        if(bone.mHasParent) {
-            writeU8(outputData, bone.mParentIndex);
-        }
-        
-        writeU8(outputData, bone.mChildren.size());
-        for(uint32_t child : bone.mChildren) {
-            writeU8(outputData, child);
+        else {
+            for(Triangle& triangle : output.mTriangles) {
+                writeU32(outputData, (uint32_t) triangle.a);
+                writeU32(outputData, (uint32_t) triangle.b);
+                writeU32(outputData, (uint32_t) triangle.c);
+            }
         }
     }
     
-    writeU8(outputData, skinningTechniqueToByte(output.mLightprobeSkinning));
-    writeU32(outputData, output.mLightprobes.size());
-    for(Lightprobe& lightprobe : output.mLightprobes) {
-        // Lightprobes are also not fixed in size
-        writeF32(outputData, lightprobe.x);
-        writeF32(outputData, lightprobe.y);
-        writeF32(outputData, lightprobe.z);
-        writeBool(outputData, lightprobe.mUseBoneWeights);
-        if(lightprobe.mUseBoneWeights) {
-            writeBoneBuffer(outputData, lightprobe.mBoneWeights);
+    if(useBones) {
+        assert(output.mBones.size() <= 256);
+        writeU8(outputData, output.mBones.size() - 1);
+        for(Bone& bone : output.mBones) {
+            // Bones are not fixed in size:
+            // - Varying length of bone names
+            // - Varying length of child array
+            
+            writeString(outputData, bone.mName);
+            writeBool(outputData, bone.mHasParent);
+            if(bone.mHasParent) writeU8(outputData, bone.mParentIndex);
+            writeU8(outputData, bone.mChildren.size());
+            for(uint32_t child : bone.mChildren) writeU8(outputData, child);
+        }
+    }
+    
+    if(useLightprobes) {
+        assert(output.mLightprobes.size() <= 256);
+        writeU8(outputData, skinningTechniqueToByte(output.mLightprobeSkinning));
+        writeU8(outputData, output.mLightprobes.size() - 1);
+        for(Lightprobe& lightprobe : output.mLightprobes) {
+            // Lightprobes are also not fixed in size
+            writeF32(outputData, lightprobe.x);
+            writeF32(outputData, lightprobe.y);
+            writeF32(outputData, lightprobe.z);
+            writeBool(outputData, lightprobe.mUseBoneWeights);
+            if(lightprobe.mUseBoneWeights) {
+                writeBoneBuffer(outputData, lightprobe.mBoneWeights);
+            }
         }
     }
 
@@ -604,38 +614,39 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     // importFlags |= aiProcess_TransformUVCoords;
     importFlags |= aiProcess_Triangulate;
     importFlags |= aiProcess_ValidateDataStructure;
-    {
-        if(paramNormalsGenerate) {
-            importFlags |= aiProcess_GenSmoothNormals;
-            std::cout << "\tGenerating normals" << std::endl;
-        }
-        
-        if(paramUvsGenerate) {
-            importFlags |= aiProcess_GenUVCoords;
-            std::cout << "\tGenerating UVs" << std::endl;
-        }
-        
-        if(paramTangentsGenerate) {
-            importFlags |= aiProcess_CalcTangentSpace;
-            std::cout << "\tGenerating tangents and bitangents" << std::endl;
-        }
-        
-        if(paramPretransform) {
-            importFlags |= aiProcess_PreTransformVertices;
-            std::cout << "\tPretransforming vertices" << std::endl;
-            std::cout << "\tWARNING: Pretransform breaks animation data!" << std::endl;
-        }
-        
-        if(paramUvsFlip) {
-            importFlags |= aiProcess_FlipUVs;
-            std::cout << "\tFlipping UVs" << std::endl;
-        }
-        
-        if(paramFlipWinding) {
-            importFlags |= aiProcess_FlipWindingOrder;
-            std::cout << "\tFlipping triangle windings" << std::endl;
-        }
+    if(paramNormalsGenerate) {
+        importFlags |= aiProcess_GenSmoothNormals;
+        std::cout << "\tGenerating normals" << std::endl;
     }
+    
+    if(paramUvsGenerate) {
+        importFlags |= aiProcess_GenUVCoords;
+        std::cout << "\tGenerating UVs" << std::endl;
+    }
+    
+    if(paramTangentsGenerate) {
+        importFlags |= aiProcess_CalcTangentSpace;
+        std::cout << "\tGenerating tangents and bitangents" << std::endl;
+    }
+    
+    if(paramPretransform) {
+        importFlags |= aiProcess_PreTransformVertices;
+        std::cout << "\tPretransforming vertices" << std::endl;
+        std::cout << "\tWARNING: Pretransform breaks animation data!" << std::endl;
+    }
+    
+    if(paramUvsFlip) {
+        importFlags |= aiProcess_FlipUVs;
+        std::cout << "\tFlipping UVs" << std::endl;
+    }
+    
+    if(paramFlipWinding) {
+        importFlags |= aiProcess_FlipWindingOrder;
+        std::cout << "\tFlipping triangle windings" << std::endl;
+    }
+    
+    std::cout << "\tArmature " << (paramArmatureEnabled ? "enabled" : "disabled") << std::endl;
+    std::cout << "\tLightprobes " << (paramLightprobesEnabled ? "enabled" : "disabled") << std::endl;
      
     // Import scene
     const aiScene* aScene = assimp.ReadFile(fromFile.string().c_str(), importFlags);
