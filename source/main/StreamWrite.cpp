@@ -82,27 +82,23 @@ uint64_t readU64(std::ifstream& input) {
 }
 
 void writeF32(std::ofstream& output, float value) {
-    output.write((char*) &value, sizeof value);
+    writeU32(output, serializeFloat32(value));
 }
 void readF32(std::ifstream& input, float& value) {
-    input.read((char*) &value, sizeof value);
+    value = readF32(input);
 }
 float readF32(std::ifstream& input) {
-    float value;
-    readF32(input, value);
-    return value;
+    return deserializeFloat32(readU32(input));
 }
 
 void writeF64(std::ofstream& output, double value) {
-    output.write((char*) &value, sizeof value);
+    writeU64(output, serializeFloat64(value));
 }
 void readF64(std::ifstream& input, double& value) {
-    input.read((char*) &value, sizeof value);
+    value = readF64(input);
 }
 double readF64(std::ifstream& input) {
-    double value;
-    readF64(input, value);
-    return value;
+    return deserializeFloat64(readU64(input));
 }
 
 void writeString(std::ofstream& output, const std::string& value) {
@@ -133,3 +129,55 @@ void readBool(std::ifstream& input, bool& value) {
 bool readBool(std::ifstream& input) {
     return readU8(input) != 0;
 }
+
+uint64_t serializeFloat(long double fInput, uint16_t totalBits, uint16_t expBits) {
+    if(fInput == 0.0) return 0;
+    uint16_t sigBits = totalBits - expBits - 1;
+    int64_t sign;
+    long double fNormalized;
+    if(fInput < 0) {
+        sign = 1;
+        fNormalized = -fInput;
+    } else {
+        sign = 0;
+        fNormalized = fInput;
+    }
+    // Arguably better than using log2l(...)
+    uint32_t exponent = 0;
+    while(fNormalized >= 2.0) {
+        fNormalized /= 2.0;
+        ++ exponent;
+    }
+    while(fNormalized < 1.0) {
+        fNormalized *= 2.0;
+        -- exponent;
+    }
+    fNormalized = fNormalized - 1.0;
+    int64_t significand = fNormalized * ((1LL << sigBits) + 0.5f);
+    int64_t exp = exponent + (1 << (expBits - 1)) - 1;
+    return
+        sign << (totalBits - 1) |
+        exp << sigBits |
+        significand;
+}
+
+long double deserializeFloat(uint64_t iInput, uint16_t totalBits, uint16_t expBits) {
+    if(iInput == 0) return 0.0;
+    uint16_t sigBits = totalBits - expBits - 1;
+    long double fOutput = iInput & ((1LL << sigBits) - 1);
+    fOutput = (fOutput / (1LL << sigBits)) + 1;
+    int64_t exponent = 
+        ((iInput >> sigBits) & ((1LL << expBits) - 1)) - 
+        ((1 << (expBits - 1)) - 1);
+    if(exponent > 0) {
+        fOutput *= 1 << exponent;
+    } else if(exponent < 0) {
+        fOutput /= 1 << -exponent;
+    }
+    return fOutput * ((iInput >> (totalBits - 1)) & 1 ? -1 : 1);
+}
+uint32_t serializeFloat32(float fInput) { return serializeFloat(fInput, 32, 8); }
+float deserializeFloat32(uint32_t iInput) { return deserializeFloat(iInput, 32, 8); }
+uint64_t serializeFloat64(double fInput) { return serializeFloat(fInput, 64, 11); }
+double deserializeFloat64(uint64_t iInput) { return deserializeFloat(iInput, 64, 11); }
+

@@ -37,4 +37,12 @@ void writeBool(std::ofstream& output, bool value);
 void readBool(std::ifstream& input, bool& value);
 bool readBool(std::ifstream& input);
 
+// IEEE Standard for Floating-Point Arithmetic (IEEE 754)
+uint64_t serializeFloat(long double fInput, uint16_t totalBits, uint16_t expBits);
+long double deserializeFloat(uint64_t iInput, uint16_t totalBits, uint16_t expBits);
+uint32_t serializeFloat32(float fInput);
+float deserializeFloat32(uint32_t iInput);
+uint64_t serializeFloat64(double fInput);
+double deserializeFloat64(uint64_t iInput);
+
 #endif // STREAMWRITE_HPP
