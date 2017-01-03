@@ -106,6 +106,11 @@ bool isWorkInProgressType(const ObjectType& type) {
 }
 
 void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
+    if(!boost::filesystem::exists(fromFile)) {
+        std::cout << "\tERROR: File does not exist: " << fromFile.filename() << std::endl;
+        return;
+    }
+    
     switch(otype) {
         case MATERIAL:
         case MODEL:
