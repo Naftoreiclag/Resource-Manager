@@ -14,6 +14,8 @@
 #include "Convert.hpp"
 #include "JsonUtil.hpp"
 
+#define WIPTYPE GEOMETRY
+
 // Useful for debug information, but significantly slows down packaging
 bool outputVerbose = false;
 
@@ -102,7 +104,7 @@ enum ObjectType {
 // If this returns true, then all files of this type will be re-converted.
 // This is useful for debugging WIP converters.
 bool isWorkInProgressType(const ObjectType& type) {
-    return false;//type == GEOMETRY;
+    return type == WIPTYPE;
 }
 
 void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {

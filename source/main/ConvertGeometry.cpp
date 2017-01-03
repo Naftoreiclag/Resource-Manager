@@ -318,14 +318,45 @@ void outputMesh(Mesh& output, const boost::filesystem::path& outputFile) {
             }
         }
     }
-    writeU32(outputData, output.mTriangles.size());
-    for(Triangle& triangle : output.mTriangles) {
-        // Triangles are also fixed in size
-        
-        writeU32(outputData, triangle.a);
-        writeU32(outputData, triangle.b);
-        writeU32(outputData, triangle.c);
+    
+    uint8_t indexSize;
+    
+    {
+        uint32_t numVerts = output.mVertices.size();
+        if(numVerts <= 1 << 8) {
+            indexSize = 1;
+        }
+        else if(numVerts <= 1 << 16) {
+            indexSize = 2;
+        }
+        else {
+            indexSize = 4;
+        }
     }
+    
+    writeU32(outputData, output.mTriangles.size());
+    if(output.mVertices.size() <= 1 << 8) {
+        for(Triangle& triangle : output.mTriangles) {
+            writeU8(outputData, (uint8_t) triangle.a);
+            writeU8(outputData, (uint8_t) triangle.b);
+            writeU8(outputData, (uint8_t) triangle.c);
+        }
+    }
+    else if(output.mVertices.size() <= 1 << 16) {
+        for(Triangle& triangle : output.mTriangles) {
+            writeU16(outputData, (uint16_t) triangle.a);
+            writeU16(outputData, (uint16_t) triangle.b);
+            writeU16(outputData, (uint16_t) triangle.c);
+        }
+    }
+    else {
+        for(Triangle& triangle : output.mTriangles) {
+            writeU32(outputData, (uint32_t) triangle.a);
+            writeU32(outputData, (uint32_t) triangle.b);
+            writeU32(outputData, (uint32_t) triangle.c);
+        }
+    }
+    
             
     
     writeU8(outputData, skinningTechniqueToByte(output.mLightprobeSkinning));
@@ -557,7 +588,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     //importFlags |= aiProcess_GenSmoothNormals;
     //importFlags |= aiProcess_GenUVCoords;
     importFlags |= aiProcess_ImproveCacheLocality;
-    importFlags |= aiProcess_JoinIdenticalVertices; // Otherwise every face will have identical vertices!!
+    importFlags |= aiProcess_JoinIdenticalVertices; // Otherwise every face will have its own vertices!!
     //importFlags |= aiProcess_LimitBoneWeights;
     // importFlags |= aiProcess_MakeLeftHanded;
     // importFlags |= aiProcess_OptimizeGraph;
@@ -873,6 +904,6 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     outputMesh(output, outputFile);
     
     // Debug
-    //outputMesh(output, fromFile.parent_path() / "debug_geometry");
+    outputMesh(output, fromFile.parent_path() / "debug_geometry");
 }
 
