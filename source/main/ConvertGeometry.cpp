@@ -195,7 +195,16 @@ struct Triangle {
 };
 
 struct Lightprobe {
+    // Position
+    float x;
+    float y;
+    float z;
     
+    //
+    bool mUseBoneWeights;
+    
+    // Bone weights
+    BoneWeightBuffer mBoneWeights;
 };
 
 struct Bone {
@@ -254,6 +263,20 @@ uint8_t skinningTechniqueToByte(SkinningTechnique st) {
     return (uint8_t) st;
 }
 
+inline void writeBoneBuffer(std::ofstream& outputData, const BoneWeightBuffer& boneBuffer) {
+    uint32_t bonesOutputted = 0;
+    for(const BoneWeight bw : boneBuffer) {
+        writeU8(outputData, bw.id);
+        writeF32(outputData, bw.weight);
+        ++ bonesOutputted;
+    }
+    assert(bonesOutputted <= 4);
+    while(bonesOutputted < 4) {
+        writeU8(outputData, 0);
+        writeF32(outputData, 0.f);
+        ++ bonesOutputted;
+    }
+}
 
 void outputMesh(Mesh& output, const boost::filesystem::path& outputFile) {
     std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
@@ -304,33 +327,7 @@ void outputMesh(Mesh& output, const boost::filesystem::path& outputFile) {
             writeF32(outputData, vertex.btz);
         }
         if(output.mUseBoneWeights) {
-            uint32_t bonesOutputted = 0;
-            for(BoneWeight bw : vertex.mBoneWeights) {
-                writeU8(outputData, bw.id);
-                writeF32(outputData, bw.weight);
-                ++ bonesOutputted;
-            }
-            assert(bonesOutputted <= 4);
-            while(bonesOutputted < 4) {
-                writeU8(outputData, 0);
-                writeF32(outputData, 0.f);
-                ++ bonesOutputted;
-            }
-        }
-    }
-    
-    uint8_t indexSize;
-    
-    {
-        uint32_t numVerts = output.mVertices.size();
-        if(numVerts <= 1 << 8) {
-            indexSize = 1;
-        }
-        else if(numVerts <= 1 << 16) {
-            indexSize = 2;
-        }
-        else {
-            indexSize = 4;
+            writeBoneBuffer(outputData, vertex.mBoneWeights);
         }
     }
     
@@ -357,20 +354,12 @@ void outputMesh(Mesh& output, const boost::filesystem::path& outputFile) {
         }
     }
     
-            
-    
-    writeU8(outputData, skinningTechniqueToByte(output.mLightprobeSkinning));
-    writeU32(outputData, output.mLightprobes.size());
-    for(Lightprobe& lightprobe : output.mLightprobes) {
-        // Lightprobes are also fixed in size
-        
-    }
-    
     assert(output.mBones.size() <= 256);
-    
     writeU8(outputData, output.mBones.size());
     for(Bone& bone : output.mBones) {
-        // Bones are not fixed in size, because of the varying size of bone names
+        // Bones are not fixed in size:
+        // - Varying length of bone names
+        // - Varying length of child array
         
         writeString(outputData, bone.mName);
         writeBool(outputData, bone.mHasParent);
@@ -381,6 +370,19 @@ void outputMesh(Mesh& output, const boost::filesystem::path& outputFile) {
         writeU8(outputData, bone.mChildren.size());
         for(uint32_t child : bone.mChildren) {
             writeU8(outputData, child);
+        }
+    }
+    
+    writeU8(outputData, skinningTechniqueToByte(output.mLightprobeSkinning));
+    writeU32(outputData, output.mLightprobes.size());
+    for(Lightprobe& lightprobe : output.mLightprobes) {
+        // Lightprobes are also not fixed in size
+        writeF32(outputData, lightprobe.x);
+        writeF32(outputData, lightprobe.y);
+        writeF32(outputData, lightprobe.z);
+        writeBool(outputData, lightprobe.mUseBoneWeights);
+        if(lightprobe.mUseBoneWeights) {
+            writeBoneBuffer(outputData, lightprobe.mBoneWeights);
         }
     }
 
@@ -634,21 +636,12 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
             std::cout << "\tFlipping triangle windings" << std::endl;
         }
     }
-    /*
-    //importFlags = 0;
-    
-        
-    //importFlags = aiProcessPreset_TargetRealtime_MaxQuality;
-*/
+     
     // Import scene
     const aiScene* aScene = assimp.ReadFile(fromFile.string().c_str(), importFlags);
 
     // Display debug information
     debugAssimp(assimp, aScene);
-    {
-        //Assimp::Exporter exporter;
-        //exporter.Export(aScene, "collada", fromFile.parent_path() / "debug.dae");
-    }
     
     if(!aScene->HasMeshes()) {
         std::cout << "\tERROR: Imported scene has no meshes!" << std::endl;
@@ -880,7 +873,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
                     }
                     
                     // Avoid division by zero
-                    if(totalWeight > 0.0) {
+                    if(totalWeight != 0.0) {
                         for(BoneWeight bw : boneWeights) {
                             bw.weight /= totalWeight;
                         }
