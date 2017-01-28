@@ -16,6 +16,7 @@ source/Makefile
 example/output/*
 example/intermediate/*
 
+lib/*
 libraries/*
 dependencies-win/*
 /example2/project/data/geometry/Cube.blend1

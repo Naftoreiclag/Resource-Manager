@@ -181,3 +181,27 @@ float deserializeFloat32(uint32_t iInput) { return deserializeFloat(iInput, 32, 
 uint64_t serializeFloat64(double fInput) { return serializeFloat(fInput, 64, 11); }
 double deserializeFloat64(uint64_t iInput) { return deserializeFloat(iInput, 64, 11); }
 
+/*
+    {
+        std::ofstream outputData("test.bin", std::ios::out | std::ios::binary);
+        writeU8(outputData, '$');
+        writeU16(outputData, 4321);
+        writeU32(outputData, 9999999);
+        writeU64(outputData, 9876543210L);
+        writeString(outputData, "Hello World");
+        writeBool(outputData, false);
+        writeF32(outputData, 3.1415926f);
+        writeF64(outputData, 3.1415926535897932384626433832795028841971694);
+    }
+    {
+        std::ifstream inputData("test.bin", std::ios::in | std::ios::binary);
+        std::cout << readU8(inputData) << std::endl;
+        std::cout << readU16(inputData) << std::endl;
+        std::cout << readU32(inputData) << std::endl;
+        std::cout << readU64(inputData) << std::endl;
+        std::cout << readString(inputData) << std::endl;
+        std::cout << readBool(inputData) << std::endl;
+        std::cout << readF32(inputData) << std::endl;
+        std::cout << readF64(inputData) << std::endl;
+    }
+*/

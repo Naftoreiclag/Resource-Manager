@@ -8,7 +8,7 @@
 
 #include <boost/filesystem.hpp>
 
-#include "json/json.h"
+#include <json/json.h>
 #include "MurmurHash3.h"
 
 #include "Convert.hpp"
@@ -104,7 +104,9 @@ enum ObjectType {
 // If this returns true, then all files of this type will be re-converted.
 // This is useful for debugging WIP converters.
 bool isWorkInProgressType(const ObjectType& type) {
-    return type == WIPTYPE;
+    return false;
+    //return type == WIPTYPE;
+    //return type == VERTEX_SHADER || type == TESS_CONTROL_SHADER || type == TESS_EVALUATION_SHADER || type == GEOMETRY_SHADER || type == FRAGMENT_SHADER || type == COMPUTE_SHADER;
 }
 
 void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
@@ -135,6 +137,15 @@ void translateData(const ObjectType& otype, const boost::filesystem::path& fromF
         }
         case WAVEFORM: {
             convertWaveform(fromFile, outputFile, params, modifyFilename);
+            break;
+        }
+        case VERTEX_SHADER:
+        case TESS_CONTROL_SHADER:
+        case TESS_EVALUATION_SHADER:
+        case GEOMETRY_SHADER:
+        case FRAGMENT_SHADER:
+        case COMPUTE_SHADER: {
+            convertGlsl(fromFile, outputFile, params, modifyFilename);
             break;
         }
         default: {

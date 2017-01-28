@@ -298,7 +298,7 @@ void outputMesh(Mesh& output, const boost::filesystem::path& outputFile) {
             output.mUseBitangents << 5 |
             output.mUseBoneWeights << 6
         );
-        writeU8(outputData, skinningTechniqueToByte(output.mLightprobeSkinning));
+        writeU8(outputData, skinningTechniqueToByte(output.mVertexSkinning));
         writeU32(outputData, output.mVertices.size());
         for(Vertex& vertex : output.mVertices) {
             // Every vertex has a fixed size in bytes, allowing for "random access" of vertices if necessary

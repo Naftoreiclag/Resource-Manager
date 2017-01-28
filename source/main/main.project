@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<CodeLite_Project Name="main" InternalType="Console">
+<CodeLite_Project Name="main" InternalType="Console" Version="10.0.0">
   <Plugins>
     <Plugin Name="qmake">
       <![CDATA[00020001N0008WinDebug0000000000000001N0010WinRelease000000000000]]>
@@ -59,13 +59,14 @@
     <File Name="JsonUtil.hpp"/>
     <File Name="JsonUtil.cpp"/>
     <File Name="ConvertGenericJson.cpp"/>
+    <File Name="ConvertGlsl.cpp"/>
   </VirtualDirectory>
   <VirtualDirectory Name="lib">
     <VirtualDirectory Name="jsoncpp">
-      <File Name="../../libraries/jsoncpp/dist/jsoncpp.cpp"/>
+      <File Name="../../lib/src/jsoncpp/dist/jsoncpp.cpp"/>
     </VirtualDirectory>
     <VirtualDirectory Name="murmur3">
-      <File Name="../../libraries/murmur3/MurmurHash3.cpp"/>
+      <File Name="../../lib/src/murmur3/MurmurHash3.cpp"/>
     </VirtualDirectory>
   </VirtualDirectory>
   <Dependencies Name="Debug"/>
@@ -95,6 +96,7 @@
       </Linker>
       <ResourceCompiler Options="" Required="no"/>
       <General OutputFile="$(IntermediateDirectory)/$(ProjectName)" IntermediateDirectory="./Debug" Command="./$(ProjectName)" CommandArguments="../../../example2/project/core.project" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
+      <BuildSystem Name="Default"/>
       <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
         <![CDATA[]]>
       </Environment>
@@ -141,6 +143,7 @@
       </Linker>
       <ResourceCompiler Options="" Required="no"/>
       <General OutputFile="$(IntermediateDirectory)/$(ProjectName)" IntermediateDirectory="./Release" Command="./$(ProjectName)" CommandArguments="../../../example2/project/core.project" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
+      <BuildSystem Name="Default"/>
       <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
         <![CDATA[]]>
       </Environment>
@@ -191,6 +194,7 @@
       </Linker>
       <ResourceCompiler Options="" Required="no"/>
       <General OutputFile="$(IntermediateDirectory)/$(ProjectName)" IntermediateDirectory="./Debug" Command="./$(ProjectName)" CommandArguments="../../../example2/project/core.project" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
+      <BuildSystem Name="Default"/>
       <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
         <![CDATA[ASSIMP_HOME=../../dependencies-win/mingw-w64/assimp-3.2]]>
       </Environment>
@@ -227,14 +231,15 @@
     <Configuration Name="WinRelease" CompilerType="MinGW ( mingw64 )" DebuggerType="GNU gdb debugger" Type="Executable" BuildCmpWithGlobalSettings="append" BuildLnkWithGlobalSettings="append" BuildResWithGlobalSettings="append">
       <Compiler Options="-O2;-std=c++11;-Wall" C_Options="-O2;-Wall" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" PCHFlags="" PCHFlagsPolicy="0">
         <IncludePath Value="."/>
-        <IncludePath Value="../../libraries/jsoncpp/dist"/>
-        <IncludePath Value="../../libraries/stb"/>
-        <IncludePath Value="../../libraries/murmur3"/>
+        <IncludePath Value="../../lib/src/jsoncpp/dist"/>
+        <IncludePath Value="../../lib/src/stb"/>
+        <IncludePath Value="../../lib/src/murmur3"/>
         <IncludePath Value="$(BOOST_HOME)"/>
         <IncludePath Value="$(ASSIMP_HOME)/include"/>
         <IncludePath Value="$(OGG_HOME)/include"/>
         <IncludePath Value="$(VORBIS_HOME)/include"/>
         <IncludePath Value="$(FLAC_HOME)/include"/>
+        <IncludePath Value="$(SPIRV_HOME)/include"/>
         <Preprocessor Value="NDEBUG"/>
       </Compiler>
       <Linker Options="" Required="yes">
@@ -243,6 +248,7 @@
         <LibraryPath Value="$(OGG_HOME)/lib"/>
         <LibraryPath Value="$(VORBIS_HOME)/lib"/>
         <LibraryPath Value="$(FLAC_HOME)/lib"/>
+        <LibraryPath Value="$(SPIRV_HOME)/lib"/>
         <Library Value="mingw32"/>
         <Library Value="boost_system-mgw51-s-1_59"/>
         <Library Value="boost_filesystem-mgw51-s-1_59"/>
@@ -255,11 +261,13 @@
       </Linker>
       <ResourceCompiler Options="" Required="no"/>
       <General OutputFile="$(IntermediateDirectory)/$(ProjectName)" IntermediateDirectory="./Release" Command="./$(ProjectName)" CommandArguments="" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
+      <BuildSystem Name="Default"/>
       <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
-        <![CDATA[ASSIMP_HOME=../../dependencies-win/mingw-w64/assimp-3.3.1
-OGG_HOME=../../dependencies-win/mingw-w64/ogg-1.3.2
-VORBIS_HOME=../../dependencies-win/mingw-w64/vorbis-1.3.5
-FLAC_HOME=../../dependencies-win/mingw-w64/flac-1.3.1]]>
+        <![CDATA[ASSIMP_HOME=../../lib/mingw-w64/assimp-3.3.1
+OGG_HOME=../../lib/mingw-w64/ogg-1.3.2
+VORBIS_HOME=../../lib/mingw-w64/vorbis-1.3.5
+FLAC_HOME=../../lib/mingw-w64/flac-1.3.1
+SPIRV_HOME=../../lib/mingw-w64/SPIRV-Tools-spirv-1.1-rev1]]>
       </Environment>
       <Debugger IsRemote="no" RemoteHostName="" RemoteHostPort="" DebuggerPath="" IsExtended="yes">
         <DebuggerSearchPaths/>

@@ -701,9 +701,9 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
 
-        const Json::Value& componentsData = params["limitComponents"];
-        if(!componentsData.isNull()) {
-            uint32_t nComponents = componentsData.asInt();
+        const Json::Value& limitComponentsData = params["limitComponents"];
+        if(!limitComponentsData.isNull()) {
+            uint32_t nComponents = limitComponentsData.asInt();
             
             if(nComponents < components && nComponents > 0) {
                 
@@ -713,6 +713,38 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     for(uint32_t x = 0; x < width; ++ x) {
                         for(uint32_t c = 0; c < nComponents; ++ c) {
                             nImage[((y * width) + x) * nComponents + c] = image[((y * width) + x) * components + c];
+                        }
+                    }
+                }
+                
+                if(manuallyFreeImage) {
+                    delete[] image;
+                } else {
+                    stbi_image_free(image);
+                }
+                manuallyFreeImage = true;
+                components = nComponents;
+                image = nImage;
+            }
+        }
+        
+        const Json::Value& extendComponentsData = params["extendComponents"];
+        if(!extendComponentsData.isNull()) {
+            uint32_t nComponents = extendComponentsData.asInt();
+            std::cout << "\tExtending components: " << nComponents << std::endl;
+            
+            if(nComponents > components) {
+                
+                unsigned char* nImage = new unsigned char[width * height * nComponents];
+                
+                for(uint32_t y = 0; y < height; ++ y) {
+                    for(uint32_t x = 0; x < width; ++ x) {
+                        for(uint32_t c = 0; c < nComponents; ++ c) {
+                            if(c > components) {
+                                nImage[((y * width) + x) * nComponents + c] = 1;
+                            } else {
+                                nImage[((y * width) + x) * nComponents + c] = image[((y * width) + x) * components + c];
+                            }
                         }
                     }
                 }

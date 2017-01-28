@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "json/json.h"
+#include <json/json.h>
 
 Json::Value readJsonFile(std::string filename);
 void writeJsonFile(std::string filename, Json::Value& value, bool compact = true);
