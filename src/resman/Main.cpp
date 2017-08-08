@@ -32,6 +32,9 @@
 
 namespace resman {
 
+// Useful for debug information, but significantly slows down packaging
+bool n_verbose = true;
+
 /**
  * @class Config
  * @brief Struct holding the config for a single resource project.
@@ -51,28 +54,35 @@ struct Config {
     boost::filesystem::path intermediateDir;
 };
 
-enum ObjectType {
-    IMAGE, // Image
-    MATERIAL, // Generic Json
-    MODEL, // Generic Json
-    COMPUTE_SHADER,
-    VERTEX_SHADER,
-    TESS_CONTROL_SHADER,
-    TESS_EVALUATION_SHADER,
-    GEOMETRY_SHADER,
-    FRAGMENT_SHADER,
-    SHADER_PROGRAM, // Generic Json
-    STRING,
-    TEXTURE, // Generic Json
-    GEOMETRY, // Geometry
-    FONT, // Font
-    WAVEFORM, // Waveform
-    SCRIPT,
-    COMPONENT,
-    COMPOSITION,
+typedef std::string OType;
 
+bool isWorkInProgressType(const OType& type) {
+    return false;
+}
+
+std::map<OType, Convert_Func> n_converters = {
+    {"material", convertGenericJson},
+    {"model", convertGenericJson},
+    {"shader-program", convertGenericJson},
+    {"texture", convertGenericJson},
     
-    OTHER
+    {"image", convertImage},
+    
+    {"geometry", convertGeometry},
+    
+    {"font", convertFont},
+    
+    {"waveform", convertWaveform},
+    
+    {"vertex-shader", convertGlsl},
+    {"tess-control-shader", convertGlsl},
+    {"tess-evaluation-shader", convertGlsl},
+    {"geometry-shader", convertGlsl},
+    {"fragment-shader", convertGlsl},
+    {"compute-shader", convertGlsl},
+    
+    {"script", convertMiscellaneous},
+    {"string", convertMiscellaneous}
 };
 
 /**
@@ -81,7 +91,7 @@ enum ObjectType {
  */
 struct Object {
     std::string mName;
-    ObjectType mType;
+    OType mType;
     boost::filesystem::path mFile;
     boost::filesystem::path mDebugOrigin;
     Json::Value mParams;
@@ -98,127 +108,32 @@ struct Object {
     uint32_t mOutputSize;
 };
 
-// Useful for debug information, but significantly slows down packaging
-bool n_verbose = true;
-
-// If this returns true, then all files of this type will be re-converted.
-// This is useful for debugging WIP converters.
-bool isWorkInProgressType(const ObjectType& type) {
-    return false;
-}
-
-void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
-    if(!boost::filesystem::exists(fromFile)) {
-        std::cout << "\tERROR: File does not exist: " << fromFile.filename() << std::endl;
-        return;
+void translateData(const Object& object, bool modifyFilename) {
+    if(!boost::filesystem::exists(object.mFile)) {
+        std::stringstream sss;
+        sss << "File does not exist: "
+            << object.mFile.filename();
+        throw std::runtime_error(sss.str());
     }
     
-    switch(otype) {
-        case MATERIAL:
-        case MODEL:
-        case SHADER_PROGRAM:
-        case TEXTURE: {
-            convertGenericJson(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
-        case IMAGE: {
-            convertImage(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
-        case GEOMETRY: {
-            convertGeometry(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
-        case FONT: {
-            convertFont(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
-        case WAVEFORM: {
-            convertWaveform(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
-        case VERTEX_SHADER:
-        case TESS_CONTROL_SHADER:
-        case TESS_EVALUATION_SHADER:
-        case GEOMETRY_SHADER:
-        case FRAGMENT_SHADER:
-        case COMPUTE_SHADER: {
-            convertGlsl(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
-        default: {
-            convertMiscellaneous(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
+    auto pair_ptr = n_converters.find(object.mType);
+    
+    if (pair_ptr == n_converters.end()) {
+        std::stringstream sss;
+        sss << "Unknown type: \""
+            << object.mType
+            << "\"";
+        throw std::runtime_error(sss.str());
     }
-    std::cout << std::endl;
-    std::ifstream sizeTest(outputFile.string().c_str(), std::ios::binary | std::ios::ate);
-    filesize = sizeTest.tellg();
-}
-
-std::string typeToString(const ObjectType& tpe) {
-    switch(tpe) {
-        case IMAGE: return "image";
-        case MATERIAL: return "material";
-        case MODEL: return "model";
-        case COMPUTE_SHADER: return "compute-shader";
-        case VERTEX_SHADER: return "vertex-shader";
-        case TESS_CONTROL_SHADER: return "tess-control-shader";
-        case TESS_EVALUATION_SHADER: return "tess-evaluation-shader";
-        case GEOMETRY_SHADER: return "geometry-shader";
-        case FRAGMENT_SHADER: return "fragment-shader";
-        case SHADER_PROGRAM: return "shader-program";
-        case STRING: return "string";
-        case TEXTURE: return "texture";
-        case GEOMETRY: return "geometry";
-        case FONT: return "font";
-        case WAVEFORM: return "waveform";
-        case SCRIPT: return "script";
-        case COMPONENT: return "component";
-        case COMPOSITION: return "composition";
-        default: return "other";
-    }
-}
-
-ObjectType stringToType(const std::string& str) {
-    if(str == "image") {
-        return IMAGE;
-    } else if(str == "material") {
-        return MATERIAL;
-    } else if(str == "model") {
-        return MODEL;
-    } else if(str == "compute-shader") {
-        return COMPUTE_SHADER;
-    } else if(str == "vertex-shader") {
-        return VERTEX_SHADER;
-    } else if(str == "tess-control-shader") {
-        return TESS_CONTROL_SHADER;
-    } else if(str == "tess-evaluation-shader") {
-        return TESS_EVALUATION_SHADER;
-    } else if(str == "geometry-shader") {
-        return GEOMETRY_SHADER;
-    } else if(str == "fragment-shader") {
-        return FRAGMENT_SHADER;
-    } else if(str == "shader-program") {
-        return SHADER_PROGRAM;
-    } else if(str == "string") {
-        return STRING;
-    } else if(str == "texture") {
-        return TEXTURE;
-    } else if(str == "geometry") {
-        return GEOMETRY;
-    } else if(str == "font") {
-        return FONT;
-    } else if(str == "waveform") {
-        return WAVEFORM;
-    } else if(str == "script") {
-        return SCRIPT;
-    } else if(str == "component") {
-        return COMPONENT;
-    } else if(str == "composition") {
-        return COMPOSITION;
-    }
-    return OTHER;
+    
+    Convert_Args args;
+    args.fromFile = object.mFile;
+    args.outputFile = object.mOutputFile;
+    args.modifyFilename = modifyFilename;
+    args.params = object.mParams;
+    
+    Convert_Func& converter = pair_ptr->second;
+    converter(args);
 }
 
 struct Project {
@@ -261,12 +176,9 @@ struct Project {
         Object object;
         object.mDebugOrigin = objectFile;
         object.mName = objectData["name"].asString();
-        object.mType = stringToType(objectData["type"].asString());
+        object.mType = objectData["type"].asString();
         object.mAlwaysRetranslate = objectData["always-retranslate"].asBool();
         object.mParams = objectData["parameters"];
-        if(object.mType == OTHER) {
-            std::cout << "Warning! Unknown resource type " << objectData["type"].asString() << " found in resource " << object.mName << " found at " << object.mDebugOrigin << std::endl;
-        }
         
         boost::filesystem::path newPath = objectFile;
         object.mFile = newPath.remove_filename() / objectData["file"].asString();
@@ -275,7 +187,7 @@ struct Project {
         
         if(n_verbose) {
             std::cout << "Resource: name = " << object.mName << std::endl;
-            std::cout << "\ttype = " << typeToString(object.mType) << std::endl;
+            std::cout << "\ttype = " << object.mType << std::endl;
             std::cout << "\tfile = " << object.mFile << std::endl;
         }
     }
@@ -565,16 +477,8 @@ struct Project {
                         const Json::Value& metadata = *meta;
 
                         uint32_t checkHash = (uint32_t) (metadata["hash"].asInt64());
-                        ObjectType checkType = stringToType(metadata["type"].asString());
+                        OType checkType = metadata["type"].asString();
                         const Json::Value& checkParams = metadata["params"];
-
-                        /*
-                        if(object.mType == ObjectType::WAVEFORM) {
-                            std::cout << "Hash match: " << (checkHash == object.mOriginalHash) << std::endl;
-                            std::cout << "Type match: " << (checkType == object.mType) << std::endl;
-                            std::cout << "Parameter match: " << (equivalentJson(checkParams, object.mParams)) << std::endl;
-                        }
-                        */
                         
                         if(checkHash == object.mOriginalHash && checkType == object.mType && equivalentJson(checkParams, object.mParams) && !isWorkInProgressType(object.mType)) {
                             
@@ -621,7 +525,7 @@ struct Project {
                 Object& object = *iter;
 
                 if(n_verbose) {
-                    std::cout << object.mName << " [" << typeToString(object.mType) << "]" << std::endl;
+                    std::cout << object.mName << " [" << object.mType << "]" << std::endl;
                 }
 
                 if(!object.mSkipTranslate || isWorkInProgressType(object.mType)) {
@@ -629,14 +533,20 @@ struct Project {
                     
                     // If verbose output is enabled, then the object name has already been printed
                     if(!n_verbose) {
-                        std::cout << " " << object.mName << " [" << typeToString(object.mType) << "]";
+                        std::cout << " " << object.mName << " [" << object.mType << "]";
                     }
                     std::cout << "..." << std::endl;
 
                     if(isWorkInProgressType(object.mType)) {
                         std::cout << "\t(WIP)" << std::endl;
                     }
-                    translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !uconf.obfuscate);
+                    translateData(object, !uconf.obfuscate);
+                    {
+                        std::cout << std::endl;
+                        std::ifstream sizeTest(object.mOutputFile.string().c_str(), std::ios::binary | std::ios::ate);
+                        
+                        object.mOutputSize = sizeTest.tellg();
+                    }
                     
                     if(boost::filesystem::exists(object.mOutputFile)) {
                         ++ numUpdates;
@@ -644,12 +554,12 @@ struct Project {
                             Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];
 
                             objectMetadata["hash"] = (Json::Int64) (object.mOriginalHash);
-                            objectMetadata["type"] = typeToString(object.mType);
+                            objectMetadata["type"] = object.mType;
                             objectMetadata["params"] = object.mParams;
 
                             std::stringstream ss;
                             ss << object.mName;
-                            ss << typeToString(object.mType);
+                            ss << object.mType;
                             ss << "-";
                             ss << ((uint32_t) (object.mOriginalHash));
                             ss << ".i";
@@ -675,7 +585,7 @@ struct Project {
                 //
                 Json::Value& objectDef = objectListData[jsonListIndex];
                 objectDef["name"] = object.mName;
-                objectDef["type"] = typeToString(object.mType);
+                objectDef["type"] = object.mType;
                 objectDef["file"] = object.mOutputFile.filename().string().c_str();
                 objectDef["size"] = object.mOutputSize;
 

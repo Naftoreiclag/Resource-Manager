@@ -215,15 +215,20 @@ struct TagPair {
  * But then again, another reason I made this resource manager is to allow this kind of carelessness without effecting the end application
  * (whatever will be using the output resources).
  */
+ 
+/* Dear past self,
+ * What?
+ * Sincerely, current self
+ */
 
-void convertWaveform(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
+void convertWaveform(const Convert_Args& args) {
     
     // Get data from params
     WaveformEncodingMode paramWaveformEncodingMode = WaveformEncodingMode::VBR;
     float paramVbrQuality = 1.f;
     std::vector<TagPair> paramTags;
-    if(!params.isNull()) {
-        const Json::Value& encMode = params["encoding-mode"];
+    if(!args.params.isNull()) {
+        const Json::Value& encMode = args.params["encoding-mode"];
         if(!encMode.isNull()) {
             std::string choice = encMode.asString();
             if(choice == "VBR") {
@@ -235,7 +240,7 @@ void convertWaveform(const boost::filesystem::path& fromFile, const boost::files
             }
         }
         
-        const Json::Value& vbrQuality = params["vbr-quality"];
+        const Json::Value& vbrQuality = args.params["vbr-quality"];
         if(!vbrQuality.isNull()) {
             paramVbrQuality = vbrQuality.asFloat();
             if(paramVbrQuality > 1.f) {
@@ -247,7 +252,7 @@ void convertWaveform(const boost::filesystem::path& fromFile, const boost::files
             }
         }
         
-        const Json::Value& tags = params["metadata"];
+        const Json::Value& tags = args.params["metadata"];
         if(!tags.isNull()) {
             for(Json::Value::const_iterator iter = tags.begin(); iter != tags.end(); ++ iter) {
                 const Json::Value& key = iter.key();
@@ -265,7 +270,7 @@ void convertWaveform(const boost::filesystem::path& fromFile, const boost::files
     // Attempt to read it as ogg-vorbis
     OggVorbis_File inputVorbisFile;
     int errorCode;
-    errorCode = ov_fopen(fromFile.string().c_str(), &inputVorbisFile);
+    errorCode = ov_fopen(args.fromFile.string().c_str(), &inputVorbisFile);
     if(errorCode) {
         if(errorCode == OV_ENOTVORBIS) {
             // Assume it is FLAC instead
@@ -344,7 +349,7 @@ void convertWaveform(const boost::filesystem::path& fromFile, const boost::files
             
             ogg_page outputOggPage;
             
-            std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
+            std::ofstream outputData(args.outputFile.string().c_str(), std::ios::out | std::ios::binary);
             
             {
                 ogg_packet streamIdentity;
@@ -464,11 +469,11 @@ void convertWaveform(const boost::filesystem::path& fromFile, const boost::files
             
             FlacUserData p;
             p.paramVbrQuality = paramVbrQuality;
-            p.outputFile = &outputFile;
+            p.outputFile = &args.outputFile;
             p.outputVorbisMetadata = outputVorbisMetadata;
             
             FLAC__StreamDecoderInitStatus inputDecoderStatus = 
-                FLAC__stream_decoder_init_file(inputFlacDecoder, fromFile.string().c_str(),
+                FLAC__stream_decoder_init_file(inputFlacDecoder, args.fromFile.string().c_str(),
                 flacDecoderWriteCallback, flacDecoderMetadataCallback, flacDecoderErrorCallback, &p);
             
             if(inputDecoderStatus != FLAC__STREAM_DECODER_INIT_STATUS_OK) {

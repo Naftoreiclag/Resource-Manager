@@ -29,12 +29,12 @@
 
 namespace resman {
 
-void convertImage(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
+void convertImage(const Convert_Args& args) {
 
     int width;
     int height;
     int components;
-    unsigned char* image = stbi_load(fromFile.string().c_str(), &width, &height, &components, 0);
+    unsigned char* image = stbi_load(args.fromFile.string().c_str(), &width, &height, &components, 0);
 
     if(!image) {
         std::cout << "\tFailed to read image!" << std::endl;
@@ -44,13 +44,13 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
     bool writeAsDebug = false;
     bool manuallyFreeImage = false;
 
-    if(!params.isNull()) {
+    if(!args.params.isNull()) {
 
-        if(!params["debug"].isNull()) {
-            writeAsDebug = params["debug"].asBool();
+        if(!args.params["debug"].isNull()) {
+            writeAsDebug = args.params["debug"].asBool();
         }
         
-        const Json::Value& voronoiData = params["voronoi"];
+        const Json::Value& voronoiData = args.params["voronoi"];
         if(!voronoiData.isNull()) {
             int nWidth = width;
             int nHeight = height;
@@ -230,7 +230,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
         
-        const Json::Value& vectorFieldData = params["pixelDisplacementField"];
+        const Json::Value& vectorFieldData = args.params["pixelDisplacementField"];
         if(!vectorFieldData.isNull()) {
             int nWidth = width;
             int nHeight = height;
@@ -415,7 +415,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
 
-        const Json::Value& distanceFieldData = params["distanceField"];
+        const Json::Value& distanceFieldData = args.params["distanceField"];
         if(!distanceFieldData.isNull()) {
             int nWidth = width;
             int nHeight = height;
@@ -670,7 +670,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
 
-        const Json::Value& resizeData = params["resize"];
+        const Json::Value& resizeData = args.params["resize"];
         if(!resizeData.isNull()) {
             int nWidth = width;
             int nHeight = height;
@@ -719,7 +719,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
 
-        const Json::Value& limitComponentsData = params["limitComponents"];
+        const Json::Value& limitComponentsData = args.params["limitComponents"];
         if(!limitComponentsData.isNull()) {
             uint32_t nComponents = limitComponentsData.asInt();
             
@@ -746,7 +746,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
         
-        const Json::Value& extendComponentsData = params["extendComponents"];
+        const Json::Value& extendComponentsData = args.params["extendComponents"];
         if(!extendComponentsData.isNull()) {
             uint32_t nComponents = extendComponentsData.asInt();
             std::cout << "\tExtending components: " << nComponents << std::endl;
@@ -779,8 +779,8 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
         }
 
         if(components > 3) {
-            if(!params["alphaCleave"].isNull()) {
-                std::string alphaCleave = params["alphaCleave"].asString();
+            if(!args.params["alphaCleave"].isNull()) {
+                std::string alphaCleave = args.params["alphaCleave"].asString();
 
                 if(alphaCleave == "premultiply") {
                     std::cout << "\tAlpha cleave: premultiply" << std::endl;
@@ -1071,7 +1071,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
     //if(writeAsDebug) {
     if(true) {
-        int result = stbi_write_png(outputFile.string().c_str(), width, height, components, image, 0);
+        int result = stbi_write_png(args.outputFile.string().c_str(), width, height, components, image, 0);
 
         if(result > 0) {
             return;
@@ -1081,7 +1081,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
         }
     }
 
-    std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
+    std::ofstream outputData(args.outputFile.string().c_str(), std::ios::out | std::ios::binary);
 
     outputData << width;
     outputData << height;

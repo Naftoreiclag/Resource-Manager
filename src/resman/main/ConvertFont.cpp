@@ -123,11 +123,11 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
     }
 }
 
-void convertFont(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
+void convertFont(const Convert_Args& args) {
 
     Json::Value fontData;
     {
-        std::ifstream fileStream(fromFile.string().c_str());
+        std::ifstream fileStream(args.fromFile.string().c_str());
         fileStream >> fontData;
         fileStream.close();
     }
@@ -150,7 +150,7 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
     font.padding = metricsData["padding"].asFloat();
     font.texture = renderingData["texture"].asString();
 
-    generateMetrics(font, fromFile.parent_path() / (metricsData["imageFile"].asString()));
+    generateMetrics(font, args.fromFile.parent_path() / (metricsData["imageFile"].asString()));
 
     // Load special cases
     const Json::Value& manualData = metricsData["manual"];
@@ -168,7 +168,7 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
     }
 
     {
-        std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
+        std::ofstream outputData(args.outputFile.string().c_str(), std::ios::out | std::ios::binary);
 
         writeString(outputData, font.texture);
         writeF32(outputData, font.baseline);

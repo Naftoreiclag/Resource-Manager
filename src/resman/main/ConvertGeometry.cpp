@@ -447,7 +447,7 @@ uint32_t recursiveBuildBoneStructure(const aiNode* copyFrom, BoneBuffer& bones, 
     return boneIndex;
 }
 
-void convertGeometry(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
+void convertGeometry(const Convert_Args& args) {
     // Importer must be kept alive.
     // Importer destroys imported data upon destruction.
     Assimp::Importer assimp;
@@ -488,7 +488,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     // Read from json configuration
     {
         {
-            const Json::Value& jsonMeshName = params["mesh-name"];
+            const Json::Value& jsonMeshName = args.params["mesh-name"];
             if(jsonMeshName.isString()) {
                 paramMeshNameSpecified = true;
                 paramMeshName = jsonMeshName.asString();
@@ -496,12 +496,12 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         }
         
         {
-            const Json::Value& jsonPretransform = params["pretransform"];
+            const Json::Value& jsonPretransform = args.params["pretransform"];
             if(jsonPretransform.isBool()) paramPretransform = jsonPretransform.asBool();
         }
         
         {
-            const Json::Value& jsonLocations = params["locations"];
+            const Json::Value& jsonLocations = args.params["locations"];
             if(!jsonLocations.isNull()) {
                 const Json::Value& jsonRemove = jsonLocations["remove"];
                 if(jsonRemove.isBool()) paramLocationsRemove = jsonRemove.asBool();
@@ -509,7 +509,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         }
         
         {
-            const Json::Value& jsonNormals = params["normals"];
+            const Json::Value& jsonNormals = args.params["normals"];
             if(!jsonNormals.isNull()) {
                 const Json::Value& jsonGenerate = jsonNormals["generate"];
                 if(jsonGenerate.isBool()) paramNormalsGenerate = jsonGenerate.asBool();
@@ -520,7 +520,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         }
         
         {
-            const Json::Value& jsonUvs = params["uvs"];
+            const Json::Value& jsonUvs = args.params["uvs"];
             if(!jsonUvs.isNull()) {
                 const Json::Value& jsonFlip = jsonUvs["flip"];
                 if(jsonFlip.isBool()) paramUvsFlip = jsonFlip.asBool();
@@ -534,7 +534,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         }
         
         {
-            const Json::Value& jsonTangents = params["tangents"];
+            const Json::Value& jsonTangents = args.params["tangents"];
             if(!jsonTangents.isNull()) {
                 const Json::Value& jsonGenerate = jsonTangents["generate"];
                 if(jsonGenerate.isBool()) paramTangentsGenerate = jsonGenerate.asBool();
@@ -545,7 +545,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         }
         
         {
-            const Json::Value& jsonColors = params["colors"];
+            const Json::Value& jsonColors = args.params["colors"];
             if(!jsonColors.isNull()) {
                 const Json::Value& jsonRemove = jsonColors["remove"];
                 if(jsonRemove.isBool()) paramColorsRemove = jsonRemove.asBool();
@@ -553,7 +553,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         }
         
         {
-            const Json::Value& jsonBones = params["bone-weights"];
+            const Json::Value& jsonBones = args.params["bone-weights"];
             if(!jsonBones.isNull()) {
                 const Json::Value& jsonNormalize = jsonBones["normalize"];
                 if(jsonNormalize.isBool()) paramBoneWeightsNormalize = jsonNormalize.asBool();
@@ -573,7 +573,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         }
         
         {
-            const Json::Value& jsonLight = params["lightprobes"];
+            const Json::Value& jsonLight = args.params["lightprobes"];
             if(!jsonLight.isNull()) {
                 const Json::Value& jsonName = jsonLight["mesh-name"];
                 if(jsonName.isString()) {
@@ -594,7 +594,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         }
         
         {
-            const Json::Value& jsonArmature = params["armature"];
+            const Json::Value& jsonArmature = args.params["armature"];
             if(!jsonArmature.isNull()) {
                 const Json::Value& jsonRootName = jsonArmature["root-name"];
                 if(jsonRootName.isString()) {
@@ -667,7 +667,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     std::cout << "\tLightprobes " << (paramLightprobesEnabled ? "enabled" : "disabled") << std::endl;
      
     // Import scene
-    const aiScene* aScene = assimp.ReadFile(fromFile.string().c_str(), importFlags);
+    const aiScene* aScene = assimp.ReadFile(args.fromFile.string().c_str(), importFlags);
 
     // Display debug information
     debugAssimp(assimp, aScene);
@@ -923,10 +923,10 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     std::cout << "\tBones: " << output.mBones.size() << std::endl;
     std::cout << "\tLightprobes: " << output.mLightprobes.size() << std::endl;
     
-    outputMesh(output, outputFile);
+    outputMesh(output, args.outputFile);
     
     // Debug
-    outputMesh(output, fromFile.parent_path() / "debug_geometry");
+    //outputMesh(output, args.fromFile.parent_path() / "debug_geometry");
 }
 
 } // namespace resman

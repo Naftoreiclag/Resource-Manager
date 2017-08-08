@@ -39,7 +39,7 @@ namespace resman {
  *      SOUEMB (followed by one 32-bit unsigned integer describing the length of the assembly)
  * 
  */
-void convertGlsl(const boost::filesystem::path& inputFilename, const boost::filesystem::path& outputFilename, const Json::Value& params, bool modifyFilename) {
+void convertGlsl(const Convert_Args& args) {
     bool paramBytecodeInclude = true;
     //paramBytecodeOptimizationLevel = 1;
     
@@ -48,7 +48,7 @@ void convertGlsl(const boost::filesystem::path& inputFilename, const boost::file
     
     {
         {
-            const Json::Value& jsonBytecodeParams = params["assemble"];
+            const Json::Value& jsonBytecodeParams = args.params["assemble"];
             if(jsonBytecodeParams.isObject()) {
                 {
                     const Json::Value& jsonInclude = jsonBytecodeParams["include"];
@@ -58,7 +58,7 @@ void convertGlsl(const boost::filesystem::path& inputFilename, const boost::file
         }
         
         {
-            const Json::Value& jsonSourceParams = params["source"];
+            const Json::Value& jsonSourceParams = args.params["source"];
             if(jsonSourceParams.isObject()) {
                 {
                     const Json::Value& jsonInclude = jsonSourceParams["include"];
@@ -79,9 +79,9 @@ void convertGlsl(const boost::filesystem::path& inputFilename, const boost::file
     
     std::stringstream ss;
     ss << "glslangValidator ";
-    ss << inputFilename.string();
+    ss << args.fromFile.string();
     ss << " -V -o ";
-    ss << outputFilename.string();
+    ss << args.outputFile.string();
     //std::cout << ss.str() << std::endl;
     std::system(ss.str().c_str());
     

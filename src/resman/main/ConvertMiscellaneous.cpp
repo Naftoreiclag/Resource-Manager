@@ -18,8 +18,8 @@
 
 namespace resman {
 
-void convertMiscellaneous(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
-    boost::filesystem::copy_file(fromFile, outputFile);
+void convertMiscellaneous(const Convert_Args& args) {
+    boost::filesystem::copy_file(args.fromFile, args.outputFile);
 }
 
 } // namespace resman
