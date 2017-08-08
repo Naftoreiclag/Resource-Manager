@@ -57,18 +57,18 @@ FLAC__StreamDecoderWriteStatus flacDecoderWriteCallback(
     int errorCode;
     
     // Called only once
-    if(inputFrame->header.number.sample_number == 0) {
+    if (inputFrame->header.number.sample_number == 0) {
         // Write intialization
         vorbis_info_init(&p.outputVorbisInfo);
         p.outputNumChannels = 1;
         errorCode = vorbis_encode_init_vbr(&p.outputVorbisInfo, p.outputNumChannels, p.inputSampleRate, p.paramVbrQuality);
-        if(errorCode) {
+        if (errorCode) {
             std::cout << "\tFailed to initialize encoding for VBR!" << std::endl;
             return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
         }
         
         errorCode = vorbis_analysis_init(&p.outputVorbisDspState, &p.outputVorbisInfo);
-        if(errorCode) {
+        if (errorCode) {
             std::cout << "\tFailed to initialize vorbis dsp state!" << std::endl;
             return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
         }
@@ -94,9 +94,9 @@ FLAC__StreamDecoderWriteStatus flacDecoderWriteCallback(
             ogg_stream_packetin(&p.outputOggStream, &serializedMetadata);
             ogg_stream_packetin(&p.outputOggStream, &codebooks);
             
-            while(true) {
+            while (true) {
                 int ret = ogg_stream_flush(&p.outputOggStream, &p.outputOggPage);
-                if(ret == 0) {
+                if (ret == 0) {
                     break;
                 }
                 p.outputData->write(reinterpret_cast<char*>(p.outputOggPage.header), p.outputOggPage.header_len);
@@ -113,7 +113,7 @@ FLAC__StreamDecoderWriteStatus flacDecoderWriteCallback(
     
     float maxAbsVal = (1 << (p.inputBitsPerSample - 1));
     
-    for(unsigned int i = 0; i < numSamplesRead; ++ i) {
+    for (unsigned int i = 0; i < numSamplesRead; ++ i) {
         // only one channel is supported right now
         outputBuffers[0][i] = inputBuffer[0][i] / maxAbsVal;
     }
@@ -124,16 +124,16 @@ FLAC__StreamDecoderWriteStatus flacDecoderWriteCallback(
     vorbis_analysis_wrote(&p.outputVorbisDspState, numSamplesRead);
 
     //
-    while(vorbis_analysis_blockout(&p.outputVorbisDspState, &p.outputVorbisBlock) == 1) {
+    while (vorbis_analysis_blockout(&p.outputVorbisDspState, &p.outputVorbisBlock) == 1) {
         vorbis_analysis(&p.outputVorbisBlock, NULL);
         vorbis_bitrate_addblock(&p.outputVorbisBlock);
         
         ogg_packet outputOggPacket;
-        while(vorbis_bitrate_flushpacket(&p.outputVorbisDspState, &outputOggPacket)) {
+        while (vorbis_bitrate_flushpacket(&p.outputVorbisDspState, &outputOggPacket)) {
             ogg_stream_packetin(&p.outputOggStream, &outputOggPacket);
-            while(true) {
+            while (true) {
                 int ret = ogg_stream_pageout(&p.outputOggStream, &p.outputOggPage);
-                if(ret == 0) {
+                if (ret == 0) {
                     break;
                 }
                 p.outputData->write(reinterpret_cast<char*>(p.outputOggPage.header), p.outputOggPage.header_len);
@@ -157,11 +157,11 @@ void flacDecoderMetadataCallback(
     std::cout << "\t\tType: FLAC" << std::endl;
     
     // comments
-    if(inputMetadata->type == FLAC__METADATA_TYPE_VORBIS_COMMENT) {
+    if (inputMetadata->type == FLAC__METADATA_TYPE_VORBIS_COMMENT) {
         FLAC__StreamMetadata_VorbisComment_Entry* comments = inputMetadata->data.vorbis_comment.comments;
         int numComments = inputMetadata->data.vorbis_comment.num_comments;
         std::cout << "\t\tMetadata:" << std::endl;
-        for(int i = 0; i < numComments; ++ i) {
+        for (int i = 0; i < numComments; ++ i) {
             std::cout << "\t\t" << i << ".\t" << comments[i].entry << std::endl;
         }
         const FLAC__StreamMetadata_VorbisComment_Entry& vendorString = inputMetadata->data.vorbis_comment.vendor_string;
@@ -169,7 +169,7 @@ void flacDecoderMetadataCallback(
     }
     
     // other
-    if(inputMetadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
+    if (inputMetadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
         p.inputSampleRate = inputMetadata->data.stream_info.sample_rate;
         p.inputBitsPerSample = inputMetadata->data.stream_info.bits_per_sample;
         p.inputNumChannels = inputMetadata->data.stream_info.channels;
@@ -227,34 +227,34 @@ void convertWaveform(const Convert_Args& args) {
     WaveformEncodingMode paramWaveformEncodingMode = WaveformEncodingMode::VBR;
     float paramVbrQuality = 1.f;
     std::vector<TagPair> paramTags;
-    if(!args.params.isNull()) {
+    if (!args.params.isNull()) {
         const Json::Value& encMode = args.params["encoding-mode"];
-        if(!encMode.isNull()) {
+        if (!encMode.isNull()) {
             std::string choice = encMode.asString();
-            if(choice == "VBR") {
+            if (choice == "VBR") {
                 paramWaveformEncodingMode = WaveformEncodingMode::VBR;
-            } else if(choice == "ABR") {
+            } else if (choice == "ABR") {
                 paramWaveformEncodingMode = WaveformEncodingMode::ABR;
-            } else if(choice == "CBR") {
+            } else if (choice == "CBR") {
                 paramWaveformEncodingMode = WaveformEncodingMode::CBR;
             }
         }
         
         const Json::Value& vbrQuality = args.params["vbr-quality"];
-        if(!vbrQuality.isNull()) {
+        if (!vbrQuality.isNull()) {
             paramVbrQuality = vbrQuality.asFloat();
-            if(paramVbrQuality > 1.f) {
+            if (paramVbrQuality > 1.f) {
                 paramVbrQuality = 1.f;
                 std::cout << "\tVBR quality clamped to maximum of 1.0" << std::endl;
-            } else if(paramVbrQuality < -0.1f) {
+            } else if (paramVbrQuality < -0.1f) {
                 paramVbrQuality = -0.1f;
                 std::cout << "\tVBR quality clamped to minimum of -0.1" << std::endl;
             }
         }
         
         const Json::Value& tags = args.params["metadata"];
-        if(!tags.isNull()) {
-            for(Json::Value::const_iterator iter = tags.begin(); iter != tags.end(); ++ iter) {
+        if (!tags.isNull()) {
+            for (Json::Value::const_iterator iter = tags.begin(); iter != tags.end(); ++ iter) {
                 const Json::Value& key = iter.key();
                 const Json::Value& value = *iter;
                 
@@ -271,8 +271,8 @@ void convertWaveform(const Convert_Args& args) {
     OggVorbis_File inputVorbisFile;
     int errorCode;
     errorCode = ov_fopen(args.fromFile.string().c_str(), &inputVorbisFile);
-    if(errorCode) {
-        if(errorCode == OV_ENOTVORBIS) {
+    if (errorCode) {
+        if (errorCode == OV_ENOTVORBIS) {
             // Assume it is FLAC instead
             paramWaveformInputFileType = WaveformInputFileType::FLAC;
             ov_clear(&inputVorbisFile);
@@ -287,13 +287,13 @@ void convertWaveform(const Convert_Args& args) {
     vorbis_comment outputVorbisMetadata;
     vorbis_comment_init(&outputVorbisMetadata);
     
-    for(std::vector<TagPair>::iterator iter = paramTags.begin(); iter != paramTags.end(); ++ iter) {
+    for (std::vector<TagPair>::iterator iter = paramTags.begin(); iter != paramTags.end(); ++ iter) {
         TagPair& tagPair = *iter;
         vorbis_comment_add_tag(&outputVorbisMetadata, tagPair.tag.c_str(), tagPair.data.c_str());
     }
     
     
-    switch(paramWaveformInputFileType) {
+    switch (paramWaveformInputFileType) {
         case WaveformInputFileType::OGG_VORBIS: {
             const vorbis_info* inputVorbisInfo = ov_info(&inputVorbisFile, -1);
             
@@ -308,7 +308,7 @@ void convertWaveform(const Convert_Args& args) {
                     char** comments = commentData->user_comments;
                     int numComments = commentData->comments;
                     std::cout << "\t\tMetadata:" << std::endl;
-                    for(int i = 0; i < numComments; ++ i) {
+                    for (int i = 0; i < numComments; ++ i) {
                         std::cout << "\t\t" << i << ".\t" << comments[i] << std::endl;
                     }
                 }
@@ -326,14 +326,14 @@ void convertWaveform(const Convert_Args& args) {
             vorbis_info_init(&outputVorbisInfo);
             int outputNumChannels = 1;
             errorCode = vorbis_encode_init_vbr(&outputVorbisInfo, outputNumChannels, inputVorbisInfo->rate, paramVbrQuality);
-            if(errorCode) {
+            if (errorCode) {
                 std::cout << "\tFailed to initialize encoding for VBR!" << std::endl;
                 return;
             }
             
             vorbis_dsp_state outputVorbisDspState;
             errorCode = vorbis_analysis_init(&outputVorbisDspState, &outputVorbisInfo);
-            if(errorCode) {
+            if (errorCode) {
                 std::cout << "\tFailed to initialize vorbis dsp state!" << std::endl;
                 return;
             }
@@ -362,9 +362,9 @@ void convertWaveform(const Convert_Args& args) {
                 ogg_stream_packetin(&outputOggStream, &serializedMetadata);
                 ogg_stream_packetin(&outputOggStream, &codebooks);
                 
-                while(true) {
+                while (true) {
                     int ret = ogg_stream_flush(&outputOggStream, &outputOggPage);
-                    if(ret == 0) {
+                    if (ret == 0) {
                         break;
                     }
                     outputData.write(reinterpret_cast<char*>(outputOggPage.header), outputOggPage.header_len);
@@ -382,18 +382,18 @@ void convertWaveform(const Convert_Args& args) {
             // Debug info
             int totalSampleNum = 0;
             
-            while(true) {
+            while (true) {
                 int ovRet = ov_read(&inputVorbisFile, inputBuffer, sizeof(inputBuffer), bigEndian, wordSize, signage, &logicalBitstreamPtr);
                 
                 // End of file
-                if(ovRet == 0) {
+                if (ovRet == 0) {
                     // Mark this as the end of the stream
                     vorbis_analysis_wrote(&outputVorbisDspState, 0);
                     
                     break;
                 }
                 // Error
-                else if(ovRet < 0) {
+                else if (ovRet < 0) {
                     std::cout << "\tRead error in ogg-vorbis decoder!" << std::endl;
                     return;
                 }
@@ -405,7 +405,7 @@ void convertWaveform(const Convert_Args& args) {
                     // Get a buffer which we must write to
                     float** outputBuffers = vorbis_analysis_buffer(&outputVorbisDspState, numSamplesRead);
                     
-                    for(int i = 0; i < numSamplesRead; ++ i) {
+                    for (int i = 0; i < numSamplesRead; ++ i) {
                         int16_t sampleData = 0;
                         
                         // Little-endian decoding
@@ -426,16 +426,16 @@ void convertWaveform(const Convert_Args& args) {
                 }
                 
                 //
-                while(vorbis_analysis_blockout(&outputVorbisDspState, &outputVorbisBlock) == 1) {
+                while (vorbis_analysis_blockout(&outputVorbisDspState, &outputVorbisBlock) == 1) {
                     vorbis_analysis(&outputVorbisBlock, NULL);
                     vorbis_bitrate_addblock(&outputVorbisBlock);
                     
                     ogg_packet outputOggPacket;
-                    while(vorbis_bitrate_flushpacket(&outputVorbisDspState, &outputOggPacket)) {
+                    while (vorbis_bitrate_flushpacket(&outputVorbisDspState, &outputOggPacket)) {
                         ogg_stream_packetin(&outputOggStream, &outputOggPacket);
-                        while(true) {
+                        while (true) {
                             int ret = ogg_stream_pageout(&outputOggStream, &outputOggPage);
-                            if(ret == 0) {
+                            if (ret == 0) {
                                 break;
                             }
                             outputData.write(reinterpret_cast<char*>(outputOggPage.header), outputOggPage.header_len);
@@ -460,7 +460,7 @@ void convertWaveform(const Convert_Args& args) {
         case WaveformInputFileType::FLAC: {
             FLAC__StreamDecoder* inputFlacDecoder = FLAC__stream_decoder_new();
             
-            if(!inputFlacDecoder) {
+            if (!inputFlacDecoder) {
                 std::cout << "\tFailed to allocate FLAC decoder!" << std::endl;
                 return;
             }
@@ -476,7 +476,7 @@ void convertWaveform(const Convert_Args& args) {
                 FLAC__stream_decoder_init_file(inputFlacDecoder, args.fromFile.string().c_str(),
                 flacDecoderWriteCallback, flacDecoderMetadataCallback, flacDecoderErrorCallback, &p);
             
-            if(inputDecoderStatus != FLAC__STREAM_DECODER_INIT_STATUS_OK) {
+            if (inputDecoderStatus != FLAC__STREAM_DECODER_INIT_STATUS_OK) {
                 std::cout << "\tFailure during FLAC decoder initialization: "
                     << FLAC__StreamDecoderInitStatusString[inputDecoderStatus] << std::endl;
                 FLAC__stream_decoder_delete(inputFlacDecoder);

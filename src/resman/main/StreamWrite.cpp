@@ -149,11 +149,11 @@ bool readBool(std::ifstream& input) {
 }
 
 uint64_t serializeFloat(long double fInput, uint16_t totalBits, uint16_t expBits) {
-    if(fInput == 0.0) return 0;
+    if (fInput == 0.0) return 0;
     uint16_t sigBits = totalBits - expBits - 1;
     int64_t sign;
     long double fNormalized;
-    if(fInput < 0) {
+    if (fInput < 0) {
         sign = 1;
         fNormalized = -fInput;
     } else {
@@ -162,11 +162,11 @@ uint64_t serializeFloat(long double fInput, uint16_t totalBits, uint16_t expBits
     }
     // Arguably better than using log2l(...)
     uint32_t exponent = 0;
-    while(fNormalized >= 2.0) {
+    while (fNormalized >= 2.0) {
         fNormalized /= 2.0;
         ++ exponent;
     }
-    while(fNormalized < 1.0) {
+    while (fNormalized < 1.0) {
         fNormalized *= 2.0;
         -- exponent;
     }
@@ -180,16 +180,16 @@ uint64_t serializeFloat(long double fInput, uint16_t totalBits, uint16_t expBits
 }
 
 long double deserializeFloat(uint64_t iInput, uint16_t totalBits, uint16_t expBits) {
-    if(iInput == 0) return 0.0;
+    if (iInput == 0) return 0.0;
     uint16_t sigBits = totalBits - expBits - 1;
     long double fOutput = iInput & ((1LL << sigBits) - 1);
     fOutput = (fOutput / (1LL << sigBits)) + 1;
     int64_t exponent = 
         ((iInput >> sigBits) & ((1LL << expBits) - 1)) - 
         ((1 << (expBits - 1)) - 1);
-    if(exponent > 0) {
+    if (exponent > 0) {
         fOutput *= 1 << exponent;
-    } else if(exponent < 0) {
+    } else if (exponent < 0) {
         fOutput /= 1 << -exponent;
     }
     return fOutput * ((iInput >> (totalBits - 1)) & 1 ? -1 : 1);

@@ -49,30 +49,30 @@ void convertGlsl(const Convert_Args& args) {
     {
         {
             const Json::Value& jsonBytecodeParams = args.params["assemble"];
-            if(jsonBytecodeParams.isObject()) {
+            if (jsonBytecodeParams.isObject()) {
                 {
                     const Json::Value& jsonInclude = jsonBytecodeParams["include"];
-                    if(jsonInclude.isBool()) paramBytecodeInclude = jsonInclude.asBool();
+                    if (jsonInclude.isBool()) paramBytecodeInclude = jsonInclude.asBool();
                 }
             }
         }
         
         {
             const Json::Value& jsonSourceParams = args.params["source"];
-            if(jsonSourceParams.isObject()) {
+            if (jsonSourceParams.isObject()) {
                 {
                     const Json::Value& jsonInclude = jsonSourceParams["include"];
-                    if(jsonInclude.isBool()) paramSourceInclude = jsonInclude.asBool();
+                    if (jsonInclude.isBool()) paramSourceInclude = jsonInclude.asBool();
                 }
                 {
                     const Json::Value& jsonStrip = jsonSourceParams["strip-comments"];
-                    if(jsonStrip.isBool()) paramSourceStripComments = jsonStrip.asBool();
+                    if (jsonStrip.isBool()) paramSourceStripComments = jsonStrip.asBool();
                 }
             }
         }
     }
     
-    if(!paramBytecodeInclude && !paramSourceInclude) {
+    if (!paramBytecodeInclude && !paramSourceInclude) {
         std::cout << "\tError! Neither bytecode nor source is being exported!" << std::endl;
         return;
     }
@@ -98,9 +98,9 @@ void convertGlsl(const Convert_Args& args) {
     std::ifstream inputFile(inputFilename.string().c_str(), std::ios::in | std::ios::binary);
     std::vector<char> inputData;
     char byte;
-    while(true) {
+    while (true) {
         inputFile.read(&byte, 1);
-        if(inputFile.eof()) {
+        if (inputFile.eof()) {
             break;
         }
         inputData.push_back(byte);
@@ -111,7 +111,7 @@ void convertGlsl(const Convert_Args& args) {
     
     std::ofstream outputFile(outputFilename.string().c_str(), std::ios::out | std::ios::binary);
     
-    for(uint32_t i = 0; i < oBinary->wordCount; ++ i) {
+    for (uint32_t i = 0; i < oBinary->wordCount; ++ i) {
         writeU32(outputFile, oBinary->code[i]);
     }
     

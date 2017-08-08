@@ -109,7 +109,7 @@ struct Object {
 };
 
 void translateData(const Object& object, bool modifyFilename) {
-    if(!boost::filesystem::exists(object.mFile)) {
+    if (!boost::filesystem::exists(object.mFile)) {
         std::stringstream sss;
         sss << "File does not exist: "
             << object.mFile.filename();
@@ -185,7 +185,7 @@ struct Project {
         
         objects.push_back(object);
         
-        if(n_verbose) {
+        if (n_verbose) {
             std::cout << "Resource: name = " << object.mName << std::endl;
             std::cout << "\ttype = " << object.mType << std::endl;
             std::cout << "\tfile = " << object.mFile << std::endl;
@@ -197,31 +197,31 @@ struct Project {
         std::vector<boost::filesystem::path>& results, 
         std::vector<boost::filesystem::path>* ignore = 0) {
             
-        if(!boost::filesystem::exists(romeo)) {
+        if (!boost::filesystem::exists(romeo)) {
             return;
         }
         
         boost::filesystem::directory_iterator endIter;
-        for(boost::filesystem::directory_iterator iter(romeo); iter != endIter; ++ iter) {
+        for (boost::filesystem::directory_iterator iter(romeo); iter != endIter; ++ iter) {
             boost::filesystem::path juliet = *iter;
-            if(boost::filesystem::is_directory(juliet)) {
+            if (boost::filesystem::is_directory(juliet)) {
                 bool search = true;
-                if(ignore) {
-                    for(std::vector<boost::filesystem::path>::iterator iter = ignore->begin(); iter != ignore->end(); ++ iter) {
-                        if(boost::filesystem::equivalent(juliet, *iter)) {
+                if (ignore) {
+                    for (std::vector<boost::filesystem::path>::iterator iter = ignore->begin(); iter != ignore->end(); ++ iter) {
+                        if (boost::filesystem::equivalent(juliet, *iter)) {
                             search = false;
                             break;
                         }
                     }
                 }
-                if(search) {
+                if (search) {
                     recursiveSearch(juliet, extension, results, ignore);
                 }
             }
             else {
-                if(juliet.has_filename() && juliet.extension() == extension) {
+                if (juliet.has_filename() && juliet.extension() == extension) {
                     results.push_back(juliet);
-                    if(n_verbose) {
+                    if (n_verbose) {
                         std::cout << "\t" << juliet.c_str() << std::endl;
                     }
                 }
@@ -257,31 +257,31 @@ struct Project {
         std::cout << std::endl;
         
         if (boost::filesystem::exists(uconf.outputDir)) {
-            if(uconf.forceOverwriteOutput) {
+            if (uconf.forceOverwriteOutput) {
                 //boost::filesystem::remove_all(outputDir);
             }
             else {
                 std::cout << "Warning! Output directory " << uconf.outputDir << " already exists!" << std::endl;
                 bool decided = false;
                 bool decision;
-                while(!decided) {
+                while (!decided) {
                     std::cout << "Overwrite? (y/n) ";
                     std::string input;
                     std::cin >> input;
                     
                     char a = *input.begin();
-                    if(a == 'y') {
+                    if (a == 'y') {
                         decided = true;
                         decision = true;
                     }
-                    else if(a == 'n') {
+                    else if (a == 'n') {
                         decided = true;
                         decision = false;
                     }
                 }
                 
                 // Overwrite
-                if(decision) {
+                if (decision) {
                     //boost::filesystem::remove_all(outputDir);
                 }
                 
@@ -292,7 +292,7 @@ struct Project {
             }
 
             boost::filesystem::directory_iterator directoryEnd;
-            for(boost::filesystem::directory_iterator dirIter(uconf.outputDir); dirIter != directoryEnd; ++ dirIter) {
+            for (boost::filesystem::directory_iterator dirIter(uconf.outputDir); dirIter != directoryEnd; ++ dirIter) {
                 boost::filesystem::remove_all(*dirIter);
             }
         }
@@ -307,15 +307,15 @@ struct Project {
         std::cout << "Found " << objectFiles.size() << " resource declaration files." << std::endl;
         std::cout << std::endl;
         
-        for(std::vector<boost::filesystem::path>::iterator objectFileIter = objectFiles.begin(); objectFileIter != objectFiles.end(); ++ objectFileIter) {
+        for (std::vector<boost::filesystem::path>::iterator objectFileIter = objectFiles.begin(); objectFileIter != objectFiles.end(); ++ objectFileIter) {
             boost::filesystem::path& objectFile = *objectFileIter;
             Json::Value objectData = readJsonFile(objectFile.string());
             
-            if(objectData.isArray()) {
-                for(Json::ValueIterator valueIter = objectData.begin(); valueIter != objectData.end(); ++ valueIter) {
+            if (objectData.isArray()) {
+                for (Json::ValueIterator valueIter = objectData.begin(); valueIter != objectData.end(); ++ valueIter) {
                     Json::Value& subData = *valueIter;
                     
-                    if(subData.isObject()) {
+                    if (subData.isObject()) {
                         parseObject(subData, objectFile);
                     }
                     else {
@@ -323,7 +323,7 @@ struct Project {
                     }
                 }
             }
-            else if(objectData.isObject()) {
+            else if (objectData.isObject()) {
                 parseObject(objectData, objectFile);
             }
             else {
@@ -340,21 +340,21 @@ struct Project {
             ObjectMap objectMap;
             
             bool foundErrors = false;
-            for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
+            for (std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
                 Object& exam = *iter;
                 
                 PathList* pathList = 0;
-                for(ObjectMap::iterator look = objectMap.begin(); look != objectMap.end(); ++ look) {
+                for (ObjectMap::iterator look = objectMap.begin(); look != objectMap.end(); ++ look) {
                     NameObjectListPair& pair = *look;
                     
                     // Oh no!
-                    if(pair.first == exam.mName) {
+                    if (pair.first == exam.mName) {
                         pathList = &pair.second;
                         break;
                     }
                 }
                 
-                if(pathList) {
+                if (pathList) {
                     foundErrors = true;
                     pathList->push_back(exam.mDebugOrigin);
                 } else {
@@ -365,14 +365,14 @@ struct Project {
                 }
             }
             
-            if(foundErrors) {
-                for(ObjectMap::iterator look = objectMap.begin(); look != objectMap.end(); ++ look) {
+            if (foundErrors) {
+                for (ObjectMap::iterator look = objectMap.begin(); look != objectMap.end(); ++ look) {
                     NameObjectListPair& pair = *look;
                     
-                    if(pair.second.size() > 1) {
+                    if (pair.second.size() > 1) {
                         std::cout << "Fatal! Detected naming conflict for resource \"" << pair.first << "\"" << std::endl;
                         std::cout << "\tOffending declaration files:" << std::endl;
-                        for(PathList::iterator egg = pair.second.begin(); egg != pair.second.end(); ++ egg) {
+                        for (PathList::iterator egg = pair.second.begin(); egg != pair.second.end(); ++ egg) {
                             std::cout << "\t" << (*egg) << std::endl;
                         }
                     }
@@ -391,12 +391,12 @@ struct Project {
         // Determine the final output filename
         {
             uint32_t seqName = 0;
-            for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
+            for (std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
                 Object& object = *iter;
 
                 boost::filesystem::path outputObjectFile = uconf.outputDir;
                 std::stringstream ss;
-                if(uconf.obfuscate) {
+                if (uconf.obfuscate) {
                     ss << seqName;
                 }
                 else {
@@ -410,18 +410,18 @@ struct Project {
             }
         }
 
-        if(!uconf.intermediateDir.empty()) {
-            if(!boost::filesystem::exists(uconf.intermediateDir)) {
+        if (!uconf.intermediateDir.empty()) {
+            if (!boost::filesystem::exists(uconf.intermediateDir)) {
                 boost::filesystem::create_directories(uconf.intermediateDir);
             }
             
             // Calcuate the hashes of input files
             std::cout << "Calculating hashes..." << std::endl;
-            for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
+            for (std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
 
                 Object& object = *iter;
                 
-                if(object.mAlwaysRetranslate) {
+                if (object.mAlwaysRetranslate) {
                     continue;
                 }
 
@@ -437,7 +437,7 @@ struct Project {
 
                 delete[] totalData;
 
-                if(n_verbose) {
+                if (n_verbose) {
                     std::cout << "\t" << object.mOriginalHash << std::endl;
                 }
             }
@@ -447,14 +447,14 @@ struct Project {
 
             boost::filesystem::path intermediateFile = uconf.intermediateDir / "intermediate.data";
 
-            if(!boost::filesystem::exists(intermediateFile)) {
+            if (!boost::filesystem::exists(intermediateFile)) {
                 std::cout << "None exists!" << std::endl;
             }
             else {
                 Json::Value previousCompilation = readJsonFile(intermediateFile.string());
 
                 const Json::Value& metadataList = previousCompilation["metadata"];
-                for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
+                for (std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
 
                     /*
                      * If a pre-compiled file exists with exactly the same:
@@ -469,20 +469,20 @@ struct Project {
 
                     Object& object = *iter;
                     
-                    if(object.mAlwaysRetranslate) {
+                    if (object.mAlwaysRetranslate) {
                         continue;
                     }
 
-                    for(Json::Value::const_iterator meta = metadataList.begin(); meta != metadataList.end(); ++ meta) {
+                    for (Json::Value::const_iterator meta = metadataList.begin(); meta != metadataList.end(); ++ meta) {
                         const Json::Value& metadata = *meta;
 
                         uint32_t checkHash = (uint32_t) (metadata["hash"].asInt64());
                         OType checkType = metadata["type"].asString();
                         const Json::Value& checkParams = metadata["params"];
                         
-                        if(checkHash == object.mOriginalHash && checkType == object.mType && equivalentJson(checkParams, object.mParams) && !isWorkInProgressType(object.mType)) {
+                        if (checkHash == object.mOriginalHash && checkType == object.mType && equivalentJson(checkParams, object.mParams) && !isWorkInProgressType(object.mType)) {
                             
-                            if(n_verbose) {
+                            if (n_verbose) {
                                 std::cout << "\tCopy: " << object.mName << std::endl;
                             }
                             object.mSkipTranslate = true;
@@ -505,8 +505,8 @@ struct Project {
             boost::filesystem::path intermediateFile = uconf.intermediateDir / "intermediate.data";
             Json::Value intermediateData;
             uint32_t metadataIndex = 0;
-            if(!uconf.intermediateDir.empty()) {
-                if(boost::filesystem::exists(intermediateFile)) {
+            if (!uconf.intermediateDir.empty()) {
+                if (boost::filesystem::exists(intermediateFile)) {
                     intermediateData = readJsonFile(intermediateFile.string());
                     metadataIndex = intermediateData["metadata"].size();
                 }
@@ -521,23 +521,23 @@ struct Project {
             Json::Value& objectListData = outputPackageData["resources"];
             uint32_t jsonListIndex = 0;
 
-            for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
+            for (std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
                 Object& object = *iter;
 
-                if(n_verbose) {
+                if (n_verbose) {
                     std::cout << object.mName << " [" << object.mType << "]" << std::endl;
                 }
 
-                if(!object.mSkipTranslate || isWorkInProgressType(object.mType)) {
+                if (!object.mSkipTranslate || isWorkInProgressType(object.mType)) {
                     std::cout << "\t->";
                     
                     // If verbose output is enabled, then the object name has already been printed
-                    if(!n_verbose) {
+                    if (!n_verbose) {
                         std::cout << " " << object.mName << " [" << object.mType << "]";
                     }
                     std::cout << "..." << std::endl;
 
-                    if(isWorkInProgressType(object.mType)) {
+                    if (isWorkInProgressType(object.mType)) {
                         std::cout << "\t(WIP)" << std::endl;
                     }
                     translateData(object, !uconf.obfuscate);
@@ -548,9 +548,9 @@ struct Project {
                         object.mOutputSize = sizeTest.tellg();
                     }
                     
-                    if(boost::filesystem::exists(object.mOutputFile)) {
+                    if (boost::filesystem::exists(object.mOutputFile)) {
                         ++ numUpdates;
-                        if(!uconf.intermediateDir.empty()) {
+                        if (!uconf.intermediateDir.empty()) {
                             Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];
 
                             objectMetadata["hash"] = (Json::Int64) (object.mOriginalHash);
@@ -569,7 +569,7 @@ struct Project {
 
                             // copy file
                             boost::filesystem::path copyTo = uconf.intermediateDir / intermFilename;
-                            if(boost::filesystem::exists(copyTo)) {
+                            if (boost::filesystem::exists(copyTo)) {
                                 boost::filesystem::remove(copyTo);
                             }
                             boost::filesystem::copy(object.mOutputFile, copyTo);
@@ -598,7 +598,7 @@ struct Project {
             std::cout << numFails << " file(s) failed" << std::endl;
             std::cout << std::endl;
 
-            if(!uconf.intermediateDir.empty()) {
+            if (!uconf.intermediateDir.empty()) {
                 std::cout << "Exporting intermediate.data... ";
                 writeJsonFile(intermediateFile.string(), intermediateData, true);
                 std::cout << "Done!" << std::endl;
@@ -622,7 +622,7 @@ using namespace resman;
 
 int main(int argc, char* argv[]) {
     Logger::initialize();
-    if(argc <= 1) {
+    if (argc <= 1) {
         std::cout << "Error: must supply path to package definition file!" << std::endl;
         std::cout << std::endl;
         std::cout << "Usage: " << argv[0] << " <path to .package file>" <<std::endl;
