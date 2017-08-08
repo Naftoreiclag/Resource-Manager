@@ -40,6 +40,11 @@ namespace resman {
  * 
  */
 void convertGlsl(const Convert_Args& args) {
+    // THIS FUNC IS DISABLED!!!
+    // VVVVVVVVVVVVVVVVVVVVVVV
+    convertMiscellaneous(args);
+    return;
+    
     bool paramBytecodeInclude = true;
     //paramBytecodeOptimizationLevel = 1;
     
