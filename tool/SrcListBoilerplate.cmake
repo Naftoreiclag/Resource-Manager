@@ -16,7 +16,7 @@
 # build target. Populates a list called PGLOCAL_SOURCES_LIST
 
 # Preferred method of adding source items is through the Python script in:
-# `util/GenerateEngineSrcList.py`
+# `util/Generate*SrcList.py`
 
 # This function appends the provided string list to PGLOCAL_SOURCES_LIST
 set(PGLOCAL_SOURCES_LIST "")

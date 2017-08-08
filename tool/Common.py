@@ -41,12 +41,18 @@ def writeWithReplacements(boilerplateFilename, outputFilename, replacements):
                 if not replaced:
                     outputFile.write(line)
 
-def indexFiles(searchPath, allowedFileExts, blacklistedDirs, includeRoot=True):
+def indexFiles(searchPath, allowedFileExts, blacklistedDirs, includeRoot=True, \
+        max_depth=None):
     ''' Indexes all of the files located in searchPath.
     
     Only files with the extensions listed in allowedFileExts are included.
     Any files located in the directories (or subdirectories thereof) listed in 
-    blacklistedDirs are excluded.
+    blacklistedDirs are excluded. 
+    
+    max_depth, if specified, limits how deep to search in the subdirectory tree.
+    A value of 0 means no subdirectories are searched, 1 means only the
+    subdirectories contained within searchPath are searched, 2 enables searching
+    in the subdirectories of those subdirectories, etc.
     
     Files at the root of the search path are included iff includeRoot is True.
     
@@ -77,7 +83,13 @@ def indexFiles(searchPath, allowedFileExts, blacklistedDirs, includeRoot=True):
             else:
                 fnameToPath[filename] = filepath
 
-    def recursiveSearch(prefixStr, location):
+    def recursiveSearch(prefixStr, location, max_depth):
+        if max_depth != None and max_depth < 0:
+            return
+        if max_depth == None:
+            next_depth = None
+        else:
+            next_depth = max_depth - 1
         for node in os.listdir(location):
             nodeLocation = os.path.join(location, node)
         
@@ -85,9 +97,10 @@ def indexFiles(searchPath, allowedFileExts, blacklistedDirs, includeRoot=True):
                 if not (prefixStr == '' and not includeRoot):
                     addSource(prefixStr + str(node))
             else:
-                recursiveSearch(prefixStr + str(node) + '/', nodeLocation)
+                recursiveSearch(prefixStr + str(node) + '/', nodeLocation, \
+                        next_depth)
 
-    recursiveSearch('', searchPath)
+    recursiveSearch('', searchPath, max_depth)
     sourceList = sorted(sourceList)
     includeDirList = sorted(includeDirList)
 

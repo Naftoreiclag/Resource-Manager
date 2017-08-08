@@ -51,43 +51,9 @@ set(PGLOCAL_ALL_REQUIRED_READY TRUE)
 message(STATUS "Package status: ")
 
 ## Header-Only / Compiled Third-party ##
-
-# EasyLog++ #
-message(STATUS "EasyLog++ ============")
-find_package(EasyLoggingPP)
-if(EASYLOGPP_FOUND)
-    message(STATUS "\tInclude Dirs: " ${EASYLOGPP_INCLUDE_DIRS})
-    message(STATUS "\tSource Files: " ${EASYLOGPP_SOURCE_FILES})
-    list(APPEND PGLOCAL_INCLUDE_DIRS ${EASYLOGPP_INCLUDE_DIRS})
-    list(APPEND PGLOCAL_MAIN_SOURCES_LIST ${EASYLOGPP_SOURCE_FILES})
-else()
-    message("\tNOT FOUND")
-    set(PGLOCAL_ALL_REQUIRED_READY FALSE)
-endif()
-
-# JsonCpp #
-message(STATUS "JsonCpp ==============")
-find_package(JsonCpp)
-if(JSONCPP_FOUND)
-    message(STATUS "\tInclude Dirs: " ${JSONCPP_INCLUDE_DIRS})
-    message(STATUS "\tSource Files: " ${JSONCPP_SOURCE_FILES})
-    list(APPEND PGLOCAL_INCLUDE_DIRS ${JSONCPP_INCLUDE_DIRS})
-    list(APPEND PGLOCAL_MAIN_SOURCES_LIST ${JSONCPP_SOURCE_FILES})
-else()
-    message("\tNOT FOUND")
-    set(PGLOCAL_ALL_REQUIRED_READY FALSE)
-endif()
-
-# STB #
-message(STATUS "STB ==================")
-find_package(STB)
-if(STB_FOUND)
-    message(STATUS "\tInclude Dirs: " ${STB_INCLUDE_DIRS})
-    list(APPEND PGLOCAL_INCLUDE_DIRS ${STB_INCLUDE_DIRS})
-else()
-    message("\tNOT FOUND")
-    set(PGLOCAL_ALL_REQUIRED_READY FALSE)
-endif()
+include("IncludesList")
+list(APPEND PGLOCAL_INCLUDE_DIRS ${PGLOCAL_INCLUDES_LIST})
+set(PGLOCAL_INCLUDES_LIST "")
 
 # Add build targets
 add_executable(${PGLOCAL_MAIN_TARGET} ${PGLOCAL_MAIN_SOURCES_LIST})

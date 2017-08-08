@@ -12,22 +12,19 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# Populates:
-# - JSONCPP_FOUND
-# - JSONCPP_INCLUDE_DIRS
-# - JSONCPP_SOURCE_FILES
+# This file contains a listing of all of the additional include dirs used in the
+# build targets. Populates a list called PGLOCAL_INCLUDES_LIST
 
-set(JSONCPP_FOUND FALSE)
-find_path(JSONCPP_INCLUDE_DIRS NAMES "json/json.h")
-set(JSONCPP_SOURCE_FILES "JSONCPP_SOURCE_FILES-NOTFOUND"
-    CACHE FILEPATH "Typically Jsoncpp.cpp")
+# Preferred method of adding source items is through the Python script in:
+# `util/GenerateIncludesList.py`
 
-if(JSONCPP_INCLUDE_DIRS)
-    set(JSONCPP_FOUND TRUE)
-    set(JSONCPP_SOURCE_FILES "${JSONCPP_INCLUDE_DIRS}/jsoncpp.cpp")
-endif()
+# This function appends the provided string list to PGLOCAL_INCLUDES_LIST
+set(PGLOCAL_INCLUDES_LIST "")
+foreach(dir 
 
-mark_as_advanced(
-    JSONCPP_INCLUDE_DIRS
-    JSONCPP_SOURCE_FILES
+### DIRECTORY LIST ###
+
 )
+list(APPEND PGLOCAL_INCLUDES_LIST 
+        "${PGLOCAL_SOURCE_DIR}/${dir}")
+endforeach()

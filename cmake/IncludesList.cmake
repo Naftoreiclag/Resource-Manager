@@ -12,17 +12,22 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# Populates:
-# - STB_FOUND
-# - STB_INCLUDE_DIRS
+# This file contains a listing of all of the additional include dirs used in the
+# build targets. Populates a list called PGLOCAL_INCLUDES_LIST
 
-set(STB_FOUND FALSE)
-find_path(STB_INCLUDE_DIRS NAMES "stb/stb.h")
+# Preferred method of adding source items is through the Python script in:
+# `util/GenerateIncludesList.py`
 
-if(STB_INCLUDE_DIRS)
-    set(STB_FOUND TRUE)
-endif()
+# This function appends the provided string list to PGLOCAL_INCLUDES_LIST
+set(PGLOCAL_INCLUDES_LIST "")
+foreach(dir 
 
-mark_as_advanced(
-    STB_INCLUDE_DIRS
+"thirdparty/easyloggingpp"
+"thirdparty/jsoncpp"
+"thirdparty/murmurhash3"
+"thirdparty/stb"
+
 )
+list(APPEND PGLOCAL_INCLUDES_LIST 
+        "${PGLOCAL_SOURCE_DIR}/${dir}")
+endforeach()
