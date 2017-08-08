@@ -17,23 +17,23 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <algorithm>
 
 #include <boost/filesystem.hpp>
 #include <json/json.h>
-#include "thirdparty/murmurhash3/MurmurHash3.h"
+#include <MurmurHash3.h>
 
 #include "logger/Logger.hpp"
 #include "main/Convert.hpp"
 #include "main/JsonUtil.hpp"
 
-#define WIPTYPE GEOMETRY
+namespace resman {
 
 // Useful for debug information, but significantly slows down packaging
-bool outputVerbose = false;
+bool outputVerbose = true;
 
 // Might not be perfect
 // This is unbelievably slow. Use only for comparing json structures of limited size
@@ -121,8 +121,6 @@ enum ObjectType {
 // This is useful for debugging WIP converters.
 bool isWorkInProgressType(const ObjectType& type) {
     return false;
-    //return type == WIPTYPE;
-    //return type == VERTEX_SHADER || type == TESS_CONTROL_SHADER || type == TESS_EVALUATION_SHADER || type == GEOMETRY_SHADER || type == FRAGMENT_SHADER || type == COMPUTE_SHADER;
 }
 
 void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
@@ -238,13 +236,54 @@ ObjectType stringToType(const std::string& str) {
     }
     return OTHER;
 }
-        
-class Package {
-public:
+
+struct Package {
     Package() { }
     ~Package() { }
     
-    // You won't see this in Java!
+    struct Config {
+        /* Default configuration:
+         *      no obfuscation
+         *      no ignored directories
+         *      output directory is named "__output__" and is a sub-directory of 
+         *          the project's root directory
+         *      previous output not overwritten
+         *      no intermediate directory / no intermediate data used
+         */
+        bool obfuscate = false;
+        std::vector<boost::filesystem::path> ignoreDirs;
+        boost::filesystem::path outputDir;
+        bool forceOverwriteOutput = false;
+        boost::filesystem::path intermediateDir;
+    };
+    
+    Config parse_config(boost::filesystem::path file_config) {
+        boost::filesystem::path outputDir = m_package_dir / "__output__";
+        
+        Config uconf;
+        
+        if (boost::filesystem::exists(file_config)) {
+            Json::Value json_config = readJsonFile(file_config.string());
+            uconf.outputDir = m_package_dir / (json_config["output"].asString());
+            uconf.obfuscate = json_config["obfuscate"].asBool();
+            uconf.forceOverwriteOutput = json_config["force-overwrite-output"].asBool();
+
+            if (!json_config["intermediate"].isNull()) {
+                uconf.intermediateDir = m_package_dir / (json_config["intermediate"].asString());
+            }
+            
+            Json::Value& json_ignore_list = json_config["ignore"];
+            
+            for (Json::Value::iterator iter = json_ignore_list.begin(); iter != json_ignore_list.end(); ++ iter) {
+                Json::Value& ignore = *iter;
+                
+                uconf.ignoreDirs.push_back(m_package_dir / (ignore.asString()));
+            }
+        }
+        
+        return uconf;
+    }
+    
     struct Object {
         std::string mName;
         ObjectType mType;
@@ -265,10 +304,10 @@ public:
 
     };
 
-    boost::filesystem::path mFile;
-    boost::filesystem::path mDir;
+    boost::filesystem::path m_package_file;
+    boost::filesystem::path m_package_dir;
     
-    Json::Value mPackageJson;
+    Json::Value m_package_json;
     
     std::vector<Object> objects;
     
@@ -334,76 +373,38 @@ public:
     
     // 
     bool process(std::string filename) {
-        std::cout << "Processing: " << filename << std::endl;
-        mFile = filename;
-        if(!boost::filesystem::exists(mFile)) {
-            std::cout << "Package file does not exist!" << std::endl;
-            return false;
-        } else {
-            std::cout << "Package file found successfully" << std::endl;
+        Logger::log()->info("Processing: %v", filename);
+        m_package_file = filename;
+        if (!boost::filesystem::exists(m_package_file)) {
+            std::stringstream sss;
+            sss << "Package file \""
+                << m_package_file << "\" does not exist!";
+            throw std::runtime_error(sss.str());
         }
-        mDir = mFile.parent_path();
+        m_package_dir = m_package_file.parent_path();
         
-        mPackageJson = readJsonFile(mFile.string());
-        
-        // Configuration file location
-        boost::filesystem::path configFile = mDir / "compile.config";
-        
-        /* Default configuration:
-         *      no obfuscation
-         *      no ignored directories
-         *      output directory is named "__output__" and is a sub-directory of the project's root directory
-         *      previous output not overwritten
-         *      no intermediate directory / no intermediate data used
-         * 
-         */
-        bool obfuscate = false;
-        std::vector<boost::filesystem::path> ignoreDirs;
-        boost::filesystem::path outputDir = mDir / "__output__";
-        bool forceOverwriteOutput = false;
-        boost::filesystem::path intermediateDir;
-        bool useIntermediate = false;
+        m_package_json = readJsonFile(m_package_file.string());
         
         // Try read configuration
-        if(boost::filesystem::exists(configFile)) {
-            Json::Value configData = readJsonFile(configFile.string());
-            
-            outputDir = mDir / (configData["output"].asString());
-            obfuscate = configData["obfuscate"].asBool();
-            forceOverwriteOutput = configData["force-overwrite-output"].asBool();
-            outputVerbose = configData["output-verbose"].asBool();
-
-            if(!configData["intermediate"].isNull()) {
-                useIntermediate = true;
-                intermediateDir = mDir / (configData["intermediate"].asString());
-            }
-            
-            Json::Value& ignoreData = configData["ignore"];
-            
-            for(Json::Value::iterator iter = ignoreData.begin(); iter != ignoreData.end(); ++ iter) {
-                Json::Value& ignore = *iter;
-                
-                ignoreDirs.push_back(mDir / (ignore.asString()));
-            }
-        }
+        Config uconf = parse_config(m_package_dir / "compile.config");
         
         // Print configuration data
         std::cout << "Configuration:" << std::endl;
-        std::cout << "\tOutput dir: " << outputDir << std::endl;
-        if(useIntermediate) {
-            std::cout << "\tIntermediate dir: " << intermediateDir << std::endl;
+        std::cout << "\tOutput dir: " << uconf.outputDir << std::endl;
+        if (!uconf.intermediateDir.empty()) {
+            std::cout << "\tIntermediate dir: " << uconf.intermediateDir << std::endl;
         } else {
             std::cout << "\tIntermediate data not used" << std::endl;
         }
-        std::cout << "\tObfuscation " << (obfuscate ? "enabled" : "disabled") << std::endl;
+        std::cout << "\tObfuscation " << (uconf.obfuscate ? "enabled" : "disabled") << std::endl;
         std::cout << std::endl;
         
-        if(boost::filesystem::exists(outputDir)) {
-            if(forceOverwriteOutput) {
+        if (boost::filesystem::exists(uconf.outputDir)) {
+            if(uconf.forceOverwriteOutput) {
                 //boost::filesystem::remove_all(outputDir);
             }
             else {
-                std::cout << "Warning! Output directory " << outputDir << " already exists!" << std::endl;
+                std::cout << "Warning! Output directory " << uconf.outputDir << " already exists!" << std::endl;
                 bool decided = false;
                 bool decision;
                 while(!decided) {
@@ -434,16 +435,16 @@ public:
             }
 
             boost::filesystem::directory_iterator directoryEnd;
-            for(boost::filesystem::directory_iterator dirIter(outputDir); dirIter != directoryEnd; ++ dirIter) {
+            for(boost::filesystem::directory_iterator dirIter(uconf.outputDir); dirIter != directoryEnd; ++ dirIter) {
                 boost::filesystem::remove_all(*dirIter);
             }
         }
-        boost::filesystem::create_directories(outputDir);
+        boost::filesystem::create_directories(uconf.outputDir);
         
         std::cout << "Searching for resources..." << std::endl;
         std::vector<boost::filesystem::path> objectFiles;
-        recursiveSearch(mDir, ".resource", objectFiles, &ignoreDirs);
-        recursiveSearch(mDir, ".resources", objectFiles, &ignoreDirs);
+        recursiveSearch(m_package_dir, ".resource", objectFiles, &uconf.ignoreDirs);
+        recursiveSearch(m_package_dir, ".resources", objectFiles, &uconf.ignoreDirs);
         std::cout << std::endl;
         
         std::cout << "Found " << objectFiles.size() << " resource declaration files." << std::endl;
@@ -536,9 +537,9 @@ public:
             for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
                 Object& object = *iter;
 
-                boost::filesystem::path outputObjectFile = outputDir;
+                boost::filesystem::path outputObjectFile = uconf.outputDir;
                 std::stringstream ss;
-                if(obfuscate) {
+                if(uconf.obfuscate) {
                     ss << seqName;
                 }
                 else {
@@ -552,9 +553,9 @@ public:
             }
         }
 
-        if(useIntermediate) {
-            if(!boost::filesystem::exists(intermediateDir)) {
-                boost::filesystem::create_directories(intermediateDir);
+        if(!uconf.intermediateDir.empty()) {
+            if(!boost::filesystem::exists(uconf.intermediateDir)) {
+                boost::filesystem::create_directories(uconf.intermediateDir);
             }
             
             // Calcuate the hashes of input files
@@ -587,7 +588,7 @@ public:
 
             std::cout << "Checking for pre-compiled data..." << std::endl;
 
-            boost::filesystem::path intermediateFile = intermediateDir / "intermediate.data";
+            boost::filesystem::path intermediateFile = uconf.intermediateDir / "intermediate.data";
 
             if(!boost::filesystem::exists(intermediateFile)) {
                 std::cout << "None exists!" << std::endl;
@@ -637,7 +638,7 @@ public:
                             }
                             object.mSkipTranslate = true;
 
-                            boost::filesystem::copy(intermediateDir / (metadata["file"].asString()), object.mOutputFile);
+                            boost::filesystem::copy(uconf.intermediateDir / (metadata["file"].asString()), object.mOutputFile);
                             std::ifstream sizeTest(object.mOutputFile.string().c_str(), std::ios::binary | std::ios::ate);
                             object.mOutputSize = sizeTest.tellg();
 
@@ -652,10 +653,10 @@ public:
         std::cout << "Translating data..." << std::endl;
         std::cout << std::endl;
         {
-            boost::filesystem::path intermediateFile = intermediateDir / "intermediate.data";
+            boost::filesystem::path intermediateFile = uconf.intermediateDir / "intermediate.data";
             Json::Value intermediateData;
             uint32_t metadataIndex = 0;
-            if(useIntermediate) {
+            if(!uconf.intermediateDir.empty()) {
                 if(boost::filesystem::exists(intermediateFile)) {
                     intermediateData = readJsonFile(intermediateFile.string());
                     metadataIndex = intermediateData["metadata"].size();
@@ -667,7 +668,7 @@ public:
             uint32_t numFails = 0;
 
             // Append the file provided by user
-            Json::Value outputPackageData = mPackageJson;
+            Json::Value outputPackageData = m_package_json;
             Json::Value& objectListData = outputPackageData["resources"];
             uint32_t jsonListIndex = 0;
 
@@ -690,11 +691,11 @@ public:
                     if(isWorkInProgressType(object.mType)) {
                         std::cout << "\t(WIP)" << std::endl;
                     }
-                    translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !obfuscate);
+                    translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !uconf.obfuscate);
                     
                     if(boost::filesystem::exists(object.mOutputFile)) {
                         ++ numUpdates;
-                        if(useIntermediate) {
+                        if(!uconf.intermediateDir.empty()) {
                             Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];
 
                             objectMetadata["hash"] = (Json::Int64) (object.mOriginalHash);
@@ -712,7 +713,7 @@ public:
                             objectMetadata["file"] = intermFilename;
 
                             // copy file
-                            boost::filesystem::path copyTo = intermediateDir / intermFilename;
+                            boost::filesystem::path copyTo = uconf.intermediateDir / intermFilename;
                             if(boost::filesystem::exists(copyTo)) {
                                 boost::filesystem::remove(copyTo);
                             }
@@ -742,7 +743,7 @@ public:
             std::cout << numFails << " file(s) failed" << std::endl;
             std::cout << std::endl;
 
-            if(useIntermediate) {
+            if(!uconf.intermediateDir.empty()) {
                 std::cout << "Exporting intermediate.data... ";
                 writeJsonFile(intermediateFile.string(), intermediateData, true);
                 std::cout << "Done!" << std::endl;
@@ -753,16 +754,19 @@ public:
 
             Json::Value& metricsData = outputPackageData["metrics"];
             metricsData["size"] = (Json::UInt64) totalSize;
-            writeJsonFile((outputDir / "data.package").string(), outputPackageData);
+            writeJsonFile((uconf.outputDir / "data.package").string(), outputPackageData);
             std::cout << "Done!" << std::endl;
             std::cout << std::endl;
         }
-        
-        return true;
     }
 };
 
+} // namespace resman
+
+using namespace resman;
+
 int main(int argc, char* argv[]) {
+    Logger::initialize();
     if(argc <= 1) {
         std::cout << "Error: must supply path to package definition file!" << std::endl;
         std::cout << std::endl;
@@ -773,5 +777,6 @@ int main(int argc, char* argv[]) {
     
     Package package;
     package.process(argv[1]);
+    Logger::cleanup();
     return 0;
 }
