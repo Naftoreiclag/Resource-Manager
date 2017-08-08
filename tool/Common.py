@@ -98,6 +98,8 @@ class CannotDeduceProjectName(Exception):
     
 def get_project_name():
     subdirs = [dir for dir in os.listdir('../src/')]
+    if 'thirdparty' in subdirs:
+        subdirs.remove('thirdparty')
     if len(subdirs) != 1:
         raise CannotDeduceProjectName()
     return subdirs[0]

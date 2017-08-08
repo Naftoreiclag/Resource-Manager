@@ -22,7 +22,18 @@
 set(PGLOCAL_SOURCES_LIST "")
 foreach(fname 
 
+"../thirdparty/murmurhash3/MurmurHash3.cpp"
 "Main.cpp"
+"logger/Logger.cpp"
+"main/ConvertFont.cpp"
+"main/ConvertGenericJson.cpp"
+"main/ConvertGeometry.cpp"
+"main/ConvertGlsl.cpp"
+"main/ConvertImage.cpp"
+"main/ConvertMiscellaneous.cpp"
+"main/ConvertWaveform.cpp"
+"main/JsonUtil.cpp"
+"main/StreamWrite.cpp"
 
 )
 list(APPEND PGLOCAL_SOURCES_LIST 

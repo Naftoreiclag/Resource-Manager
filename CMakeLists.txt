@@ -37,7 +37,7 @@ set(PGLOCAL_SOURCE_DIR "${RESMAN_SOURCE_DIR}/src")
 set(PGLOCAL_INCLUDE_DIRS ${PGLOCAL_SOURCE_DIR})
 
 # Name of target executable
-set(PGLOCAL_MAIN_TARGET "${PGLOCAL_HUMAN_NAME}")
+set(PGLOCAL_MAIN_TARGET "${PGLOCAL_PROJ_NAME}")
 
 ### User options ###
 
@@ -80,7 +80,7 @@ endif()
 
 # STB #
 message(STATUS "STB ==================")
-find_package(JsonCpp)
+find_package(STB)
 if(STB_FOUND)
     message(STATUS "\tInclude Dirs: " ${STB_INCLUDE_DIRS})
     list(APPEND PGLOCAL_INCLUDE_DIRS ${STB_INCLUDE_DIRS})
@@ -112,7 +112,7 @@ endif()
 
 # Boost #
 message(STATUS "Boost Filesystem =====")
-find_package(Boost 1.45.0 system filesystem)
+find_package(Boost 1.45.0 COMPONENTS system filesystem)
 if(Boost_FOUND)
     message(STATUS "\tInclude Dirs: " ${Boost_INCLUDE_DIRS})
     message(STATUS "\tLibraries: " ${Boost_LIBRARIES})

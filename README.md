@@ -1,9 +1,9 @@
-Naftoreiclag's Resource Manager
-===============================
+# Naftoreiclag's Resource Manager
+
 *Currently thinking of a better name...*
 
-Description
------------
+## Description
+
 This yet-unnamed project simplifies packaging of files meant to be shipped with a piece of software to be utilized at run-time by said software (as "resources" or "assets"). I created this software to solve various issues I kept running into while developing a video game:
 
 
@@ -29,8 +29,56 @@ Output file formats:
 |---|---|
 |Image|.png|
 |3D Model|custom|
+## Building & Running
 
-Notes
------
-*(This README is a work in progress.)*
+Uses [CMake](https://cmake.org/) for build configurations.
 
+### Dependencies
+
+myproject requires the following libraries to be built correctly.
+
+- [Assimp](http://assimp.sourceforge.net/)
+  for 3D data loading
+- [Boost](http://www.boost.org/)
+  for all-around usefulness
+- [Easylogging++](https://github.com/muflihun/easyloggingpp/)
+  for logging
+- [FLAC](https://xiph.org/flac/)
+- [JsonCpp](https://github.com/open-source-parsers/jsoncpp/)
+  for serialization, config files
+- [Ogg](https://www.xiph.org/ogg/)
+- [stb](https://github.com/nothings/stb)
+  for image loading
+- [Vorbis](http://www.vorbis.com/)
+
+*Each library listed above is the copyright of its respective author(s). Please
+see individual library homepages for more accurate licensing information.*
+
+### Utilities
+
+In the `tool/` directory are Python scripts that you may find useful:
+- `GenerateSrcLists.py` populates the cmake files 
+  `cmake/MainSrcList.cmake` and `cmake/TestSrcList.cmake` from the contents 
+  of the `src/` directory.
+- `SyncEngineCodelite.py` populates a [Codelite](https://codelite.org/)
+  project file (by default, `ide/Codelite/Codelite.project`).
+- `RefactorHeaderIncludes.py` was used to refactor older source and header
+  files to use the new source folder format.
+
+### License
+
+Source code files in this repository for which I, James Fong, am the copyright 
+holder are distributed under the
+[Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+A copy of this license is available in the `LICENSE` file located in the
+root of this repository.
+
+Included in this repository may be source code for other open-source projects
+that are embedded in this project. This source code for such third-party
+projects is available in the `src/thirdparty` subdirectory. 
+Such projects may be subject to different licensing terms. Please see 
+individual files for details.
+
+Files found outside the `src/` repository, including but not limited to those
+located in the `cmake/` directory, may also be subject to different licensing
+terms. See individual files for details.
