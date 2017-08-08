@@ -148,18 +148,20 @@ private:
         
         if (boost::filesystem::exists(file_config)) {
             Json::Value json_config = readJsonFile(file_config.string());
-            uconf.outputDir = m_package_dir / (json_config["output"].asString());
+            uconf.outputDir = m_package_dir 
+                    / (json_config["output"].asString());
             uconf.obfuscate = json_config["obfuscate"].asBool();
-            uconf.forceOverwriteOutput = json_config["force-overwrite-output"].asBool();
+            uconf.forceOverwriteOutput = 
+                    json_config["force-overwrite-output"].asBool();
 
             if (!json_config["intermediate"].isNull()) {
-                uconf.intermediateDir = m_package_dir / (json_config["intermediate"].asString());
+                uconf.intermediateDir = m_package_dir 
+                        / (json_config["intermediate"].asString());
             }
             
             Json::Value& json_ignore_list = json_config["ignore"];
             
-            for (Json::Value::iterator iter = json_ignore_list.begin(); iter != json_ignore_list.end(); ++ iter) {
-                Json::Value& ignore = *iter;
+            for (Json::Value& ignore : json_ignore_list) {
                 
                 uconf.ignoreDirs.push_back(m_package_dir / (ignore.asString()));
             }
@@ -175,7 +177,8 @@ private:
     
     std::vector<Object> objects;
     
-    void parseObject(const Json::Value& objectData, const boost::filesystem::path& objectFile) {
+    void parseObject(const Json::Value& objectData, 
+            const boost::filesystem::path& objectFile) {
         Object object;
         object.mDebugOrigin = objectFile;
         object.mName = objectData["name"].asString();
@@ -184,7 +187,8 @@ private:
         object.mParams = objectData["parameters"];
         
         boost::filesystem::path newPath = objectFile;
-        object.mFile = newPath.remove_filename() / objectData["file"].asString();
+        object.mFile = newPath.remove_filename() 
+                / objectData["file"].asString();
         
         objects.push_back(object);
         
@@ -198,27 +202,30 @@ private:
     void recursiveSearch(const boost::filesystem::path& root, 
             const std::string& extension, 
             std::vector<boost::filesystem::path>& results, 
-            std::vector<boost::filesystem::path>* ignore = nullptr) {
+            const std::vector<boost::filesystem::path>* ignore_list = nullptr) {
             
         if (!boost::filesystem::exists(root)) {
             return;
         }
         
-        boost::filesystem::directory_iterator endIter;
-        for (boost::filesystem::directory_iterator iter(root); iter != endIter; ++ iter) {
+        boost::filesystem::directory_iterator iter_end;
+        for (boost::filesystem::directory_iterator iter(root); 
+                iter != iter_end; ++iter) {
             boost::filesystem::path subdir = *iter;
             if (boost::filesystem::is_directory(subdir)) {
-                bool search = true;
-                if (ignore) {
-                    for (std::vector<boost::filesystem::path>::iterator iter = ignore->begin(); iter != ignore->end(); ++ iter) {
-                        if (boost::filesystem::equivalent(subdir, *iter)) {
-                            search = false;
+                bool ignore = false;
+                if (ignore_list) {
+                    for (const boost::filesystem::path& ignored_dir : 
+                            *ignore_list) {
+                        if (boost::filesystem::equivalent(subdir, 
+                                ignored_dir)) {
+                            ignore = true;
                             break;
                         }
                     }
                 }
-                if (search) {
-                    recursiveSearch(subdir, extension, results, ignore);
+                if (!ignore) {
+                    recursiveSearch(subdir, extension, results, ignore_list);
                 }
             }
             else {
@@ -291,7 +298,8 @@ private:
             }
 
             boost::filesystem::directory_iterator directoryEnd;
-            for (boost::filesystem::directory_iterator dirIter(uconf.outputDir); dirIter != directoryEnd; ++ dirIter) {
+            for (boost::filesystem::directory_iterator dirIter(uconf.outputDir);
+                    dirIter != directoryEnd; ++ dirIter) {
                 boost::filesystem::remove_all(*dirIter);
             }
         }
@@ -300,55 +308,54 @@ private:
     
     void locate_resources() {
         Logger::log()->info("Searching for resources...");
-        recursiveSearch(m_package_dir, ".resource", objectFiles, &uconf.ignoreDirs);
-        recursiveSearch(m_package_dir, ".resources", objectFiles, &uconf.ignoreDirs);
+        recursiveSearch(m_package_dir, 
+                ".resource", objectFiles, &uconf.ignoreDirs);
+        recursiveSearch(m_package_dir, 
+                ".resources", objectFiles, &uconf.ignoreDirs);
         
         Logger::log()->info("Found %v resource declaration files.",
                 objectFiles.size());
     }
     
     void parse_resource_declaration_files() {
-        for (std::vector<boost::filesystem::path>::iterator objectFileIter = objectFiles.begin(); objectFileIter != objectFiles.end(); ++ objectFileIter) {
-            boost::filesystem::path& objectFile = *objectFileIter;
-            Json::Value objectData = readJsonFile(objectFile.string());
+        for (boost::filesystem::path& res_decl_file : objectFiles) {
+            Json::Value json_res_decl = readJsonFile(res_decl_file.string());
             
             std::vector<const Json::Value*> to_parse;
-            if (objectData.isArray()) {
-                for (Json::ValueIterator valueIter = objectData.begin(); valueIter != objectData.end(); ++ valueIter) {
-                    const Json::Value& subData = *valueIter;
-                    
+            if (json_res_decl.isArray()) {
+                for (const Json::Value& subData : json_res_decl) {
                     if (!subData.isObject()) {
                         Logger::log()->warn("Resource declared in %v is not "
                                 "valid, (value = %v)",
-                                objectFile,
+                                res_decl_file,
                                 subData.toStyledString());
                         continue;
                     }
                     to_parse.push_back(&subData);
                 }
             }
-            else if (objectData.isObject()) {
-                to_parse.push_back(&objectData);
+            else if (json_res_decl.isObject()) {
+                to_parse.push_back(&json_res_decl);
             }
             else {
                 Logger::log()->warn("Resource declared in %v is not "
                         "valid, (value = %v)",
-                        objectFile,
-                        objectData.toStyledString());
+                        res_decl_file,
+                        json_res_decl.toStyledString());
             }
             
             for (const Json::Value* json_obj_ptr : to_parse) {
                 const Json::Value& json_obj = *json_obj_ptr;
                 try {
-                    parseObject(json_obj, objectFile);
+                    parseObject(json_obj, res_decl_file);
                 } catch (std::runtime_error e) {
                     std::stringstream sss;
                     sss << "Error while parsing resource delcared in "
-                        << objectFile << ": "
+                        << res_decl_file << ": "
                         << e.what();
                     Logger::log()->warn("Could not parse resource "
                             "declared in %v, (value = %v): %v",
-                            objectFile,
+                            res_decl_file,
                             json_obj.toStyledString(),
                             e.what());
                 }
@@ -363,12 +370,9 @@ private:
         ObjectMap objectMap;
         
         bool foundErrors = false;
-        for (std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
-            Object& exam = *iter;
-            
-            PathList* pathList = 0;
-            for (ObjectMap::iterator look = objectMap.begin(); look != objectMap.end(); ++ look) {
-                NameObjectListPair& pair = *look;
+        for (Object& exam : objects) {
+            PathList* pathList = nullptr;
+            for (NameObjectListPair& pair : objectMap) {
                 
                 // Oh no!
                 if (pair.first == exam.mName) {
@@ -390,14 +394,13 @@ private:
         
         if (foundErrors) {
             std::stringstream sss;
-            for (ObjectMap::iterator look = objectMap.begin(); look != objectMap.end(); ++ look) {
-                NameObjectListPair& pair = *look;
+            for (NameObjectListPair& pair : objectMap) {
                 
                 if (pair.second.size() > 1) {
-                    sss << "Fatal! Detected naming conflict for resource \"" << pair.first << "\"\n"
-                        << "\tOffending declaration files:\n";
-                    for (PathList::iterator egg = pair.second.begin(); egg != pair.second.end(); ++ egg) {
-                        sss << "\t" << (*egg) << "\n";
+                    sss << "Fatal! Detected naming conflict for resource \"" 
+                        << pair.first << "\"\n\tOffending declaration files:\n";
+                    for (boost::filesystem::path& file : pair.second) {
+                        sss << "\t" << file << "\n";
                     }
                 }
             }
@@ -410,8 +413,7 @@ private:
     
     void determine_final_output_names() {
         uint32_t seqName = 0;
-        for (std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
-            Object& object = *iter;
+        for (Object& object : objects) {
 
             boost::filesystem::path outputObjectFile = uconf.outputDir;
             std::stringstream ss;
@@ -435,17 +437,15 @@ private:
                 boost::filesystem::create_directories(uconf.intermediateDir);
             }
             
-            // Calcuate the hashes of input files
-            std::cout << "Calculating hashes..." << std::endl;
-            for (std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
-
-                Object& object = *iter;
+            Logger::log()->info("Calculating hashes...");
+            for (Object& object : objects) {
                 
                 if (object.mAlwaysRetranslate) {
                     continue;
                 }
 
-                std::ifstream sizeTest(object.mFile.string().c_str(), std::ios::binary | std::ios::ate);
+                std::ifstream sizeTest(object.mFile.string().c_str(), 
+                        std::ios::binary | std::ios::ate);
                 object.mOriginalSize = sizeTest.tellg();
 
                 char* totalData = new char[object.mOriginalSize];
@@ -453,29 +453,27 @@ private:
                 sizeTest.read(totalData, object.mOriginalSize);
                 sizeTest.close();
 
-                MurmurHash3_x86_32(totalData, object.mOriginalSize, 1337, &(object.mOriginalHash));
+                MurmurHash3_x86_32(totalData, object.mOriginalSize, 1337, 
+                        &(object.mOriginalHash));
 
                 delete[] totalData;
-
-                if (n_verbose) {
-                    std::cout << "\t" << object.mOriginalHash << std::endl;
-                }
             }
-            std::cout << std::endl;
 
-            std::cout << "Checking for pre-compiled data..." << std::endl;
+            Logger::log()->info("Checking for pre-compiled data...");
 
-            boost::filesystem::path intermediateFile = uconf.intermediateDir / "intermediate.data";
+            boost::filesystem::path intermediateFile = uconf.intermediateDir 
+                    / "intermediate.data";
 
             if (!boost::filesystem::exists(intermediateFile)) {
-                std::cout << "None exists!" << std::endl;
+                Logger::log()->info("None exists!");
             }
             else {
-                Json::Value previousCompilation = readJsonFile(intermediateFile.string());
+                Json::Value previousCompilation = 
+                        readJsonFile(intermediateFile.string());
 
-                const Json::Value& metadataList = previousCompilation["metadata"];
-                for (std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
-
+                const Json::Value& metadataList = 
+                        previousCompilation["metadata"];
+                for (Object& object : objects) {
                     /*
                      * If a pre-compiled file exists with exactly the same:
                      *  Input file hash
@@ -483,32 +481,38 @@ private:
                      *      Type
                      *      Parameters
                      *
-                     * Then simply copy the data into the output folder rather than translate it again.
-                     *      (Therefore remove that object from the list of objects to translate.)
+                     * Then simply copy the data into the output folder rather 
+                     * than translate it again. (Therefore remove that object 
+                     * from the list of objects to translate.)
                      */
-
-                    Object& object = *iter;
                     
                     if (object.mAlwaysRetranslate) {
                         continue;
                     }
 
-                    for (Json::Value::const_iterator meta = metadataList.begin(); meta != metadataList.end(); ++ meta) {
-                        const Json::Value& metadata = *meta;
+                    for (const Json::Value& metadata : metadataList) {
 
-                        uint32_t checkHash = (uint32_t) (metadata["hash"].asInt64());
+                        uint32_t checkHash = 
+                                (uint32_t) (metadata["hash"].asInt64());
                         OType checkType = metadata["type"].asString();
                         const Json::Value& checkParams = metadata["params"];
                         
-                        if (checkHash == object.mOriginalHash && checkType == object.mType && equivalentJson(checkParams, object.mParams) && !isWorkInProgressType(object.mType)) {
+                        if (checkHash == object.mOriginalHash 
+                                && checkType == object.mType 
+                                && equivalentJson(checkParams, object.mParams) 
+                                && !isWorkInProgressType(object.mType)) {
                             
                             if (n_verbose) {
-                                std::cout << "\tCopy: " << object.mName << std::endl;
+                                Logger::log()->info("\tCopy: %v", object.mName);
                             }
                             object.mSkipTranslate = true;
 
-                            boost::filesystem::copy(uconf.intermediateDir / (metadata["file"].asString()), object.mOutputFile);
-                            std::ifstream sizeTest(object.mOutputFile.string().c_str(), std::ios::binary | std::ios::ate);
+                            boost::filesystem::copy(uconf.intermediateDir 
+                                    / (metadata["file"].asString()), 
+                                    object.mOutputFile);
+                            std::ifstream sizeTest(
+                                    object.mOutputFile.string().c_str(), 
+                                    std::ios::binary | std::ios::ate);
                             object.mOutputSize = sizeTest.tellg();
 
                             break;
@@ -522,7 +526,8 @@ private:
     
     void translate_all_data() {
         Logger::log()->info("Translating all resources...");
-        boost::filesystem::path intermediateFile = uconf.intermediateDir / "intermediate.data";
+        boost::filesystem::path intermediateFile = uconf.intermediateDir 
+                / "intermediate.data";
         Json::Value intermediateData;
         uint32_t metadataIndex = 0;
         if (!uconf.intermediateDir.empty()) {
@@ -541,8 +546,7 @@ private:
         Json::Value& objectListData = outputPackageData["resources"];
         uint32_t jsonListIndex = 0;
 
-        for (std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
-            Object& object = *iter;
+        for (Object& object : objects) {
 
             if (n_verbose) {
                 std::cout << object.mName << " [" << object.mType << "]" << std::endl;
@@ -570,13 +574,16 @@ private:
                 }
                 
                 std::cout << std::endl;
-                std::ifstream sizeTest(object.mOutputFile.string().c_str(), std::ios::binary | std::ios::ate);
+                std::ifstream sizeTest(object.mOutputFile.string().c_str(), 
+                        std::ios::binary | std::ios::ate);
                 object.mOutputSize = sizeTest.tellg();
                 ++ numUpdates;
                 if (!uconf.intermediateDir.empty()) {
-                    Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];
+                    Json::Value& objectMetadata = 
+                            intermediateData["metadata"][metadataIndex];
 
-                    objectMetadata["hash"] = (Json::Int64) (object.mOriginalHash);
+                    objectMetadata["hash"] = 
+                            (Json::Int64) (object.mOriginalHash);
                     objectMetadata["type"] = object.mType;
                     objectMetadata["params"] = object.mParams;
 
@@ -591,7 +598,8 @@ private:
                     objectMetadata["file"] = intermFilename;
 
                     // copy file
-                    boost::filesystem::path copyTo = uconf.intermediateDir / intermFilename;
+                    boost::filesystem::path copyTo = uconf.intermediateDir 
+                            / intermFilename;
                     if (boost::filesystem::exists(copyTo)) {
                         boost::filesystem::remove(copyTo);
                     }
@@ -627,7 +635,8 @@ private:
 
         Json::Value& metricsData = outputPackageData["metrics"];
         metricsData["size"] = (Json::UInt64) totalSize;
-        writeJsonFile((uconf.outputDir / "data.package").string(), outputPackageData);
+        writeJsonFile((uconf.outputDir / "data.package").string(), 
+                outputPackageData);
         std::cout << "Done!" << std::endl;
         std::cout << std::endl;
     }
@@ -717,10 +726,9 @@ using namespace resman;
 int main(int argc, char* argv[]) {
     Logger::initialize();
     if (argc <= 1) {
-        std::cout << "Error: must supply path to package definition file!" << std::endl;
-        std::cout << std::endl;
-        std::cout << "Usage: " << argv[0] << " <path to .package file>" <<std::endl;
-        std::cout << std::endl;
+        Logger::log()->warn(
+                "Error: must supply path to package definition file!");
+        Logger::log()->warn("Usage: %v <path to .package file>", argv[0]);
         return 0;
     }
     
