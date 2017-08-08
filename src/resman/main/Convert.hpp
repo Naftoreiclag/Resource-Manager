@@ -7,6 +7,8 @@
 
 #include <json/json.h>
 
+namespace resman {
+
 void convertImage(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename = true);
 void convertMiscellaneous(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename = true);
 void convertGeometry(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename = true);
@@ -14,5 +16,7 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
 void convertWaveform(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename = true);
 void convertGenericJson(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename = true);
 void convertGlsl(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename = true);
+
+} // namespace resman
 
 #endif // CONVERT_HPP

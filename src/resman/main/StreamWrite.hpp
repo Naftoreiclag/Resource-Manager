@@ -21,6 +21,8 @@
 #include <string>
 #include <stdint.h>
 
+namespace resman {
+
 void writeU8(std::ofstream& output, uint8_t value);
 void readU8(std::ifstream& input, uint8_t& value);
 uint8_t readU8(std::ifstream& input);
@@ -60,5 +62,7 @@ uint32_t serializeFloat32(float fInput);
 float deserializeFloat32(uint32_t iInput);
 uint64_t serializeFloat64(double fInput);
 double deserializeFloat64(uint64_t iInput);
+
+} // namespace resman
 
 #endif // STREAMWRITE_HPP

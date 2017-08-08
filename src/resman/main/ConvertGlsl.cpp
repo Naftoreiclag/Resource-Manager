@@ -27,6 +27,8 @@
 
 #include "StreamWrite.hpp"
 
+namespace resman {
+
 /* Bytecode is compiled using SPIRV
  * 
  * TODO:
@@ -121,3 +123,5 @@ void convertGlsl(const boost::filesystem::path& inputFilename, const boost::file
     // TODO: something with the params
     
 }
+
+} // namespace resman

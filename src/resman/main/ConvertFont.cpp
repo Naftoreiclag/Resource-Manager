@@ -11,6 +11,8 @@
 
 #include "StreamWrite.hpp"
 
+namespace resman {
+
 struct FontDesc {
     float baseline;
     float padding;
@@ -179,3 +181,5 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
         outputData.close();
     }
 }
+
+} // namespace resman

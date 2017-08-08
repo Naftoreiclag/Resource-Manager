@@ -24,6 +24,8 @@
 #include "vorbis/codec.h"
 #include "FLAC/stream_decoder.h"
 
+namespace resman {
+
 // TODO: add support for multiple channels
 
 struct FlacUserData {
@@ -500,3 +502,5 @@ void convertWaveform(const boost::filesystem::path& fromFile, const boost::files
         }
     }
 }
+
+} // namespace resman

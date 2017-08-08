@@ -27,6 +27,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+namespace resman {
+
 void convertImage(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
 
     int width;
@@ -1104,3 +1106,5 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
     return;
 }
+
+} // namespace resman

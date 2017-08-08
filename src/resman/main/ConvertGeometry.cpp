@@ -28,6 +28,8 @@
 
 #include "StreamWrite.hpp"
 
+namespace resman {
+
 void debugAiNode(const aiScene* scene, const aiNode* node, uint32_t depth, bool lastChild) {
 
     char vert = '|';
@@ -926,4 +928,6 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     // Debug
     outputMesh(output, fromFile.parent_path() / "debug_geometry");
 }
+
+} // namespace resman
 

@@ -32,66 +32,24 @@
 
 namespace resman {
 
-// Useful for debug information, but significantly slows down packaging
-bool outputVerbose = true;
-
-// Might not be perfect
-// This is unbelievably slow. Use only for comparing json structures of limited size
-bool equivalentJson(const Json::Value& json1, const Json::Value& json2) {
-    if(json1.isNull()) return json2.isNull();
-    if(json1.isBool()) return json2.isBool() && json1.asBool() == json2.asBool();
-    if(json1.isUInt64() && json2.isUInt64()) return json1.asUInt64() == json2.asUInt64();
-    if(json1.isInt64() && json2.isInt64()) return json1.asInt64() == json2.asInt64();
-    if(json1.isUInt() && json2.isUInt()) return json1.asUInt() == json2.asUInt();
-    if(json1.isInt() && json2.isInt()) return json1.asInt() == json2.asInt();
-    if(json1.isDouble() && json2.isDouble()) return json1.asDouble() == json2.asDouble();
-    if(json1.isNumeric()) return json2.isNumeric() && json1.asDouble() == json2.asDouble();
-    if(json1.isString()) return json2.isString() && json1.asString() == json2.asString();
-    
-    if(json1.isArray()) {
-        if(json2.isArray() && json1.size() == json2.size()) {
-            std::vector<const Json::Value*> array1;
-            std::vector<const Json::Value*> array2;
-            
-            for(const Json::Value& val1 : json1) array1.push_back(&val1);
-            for(const Json::Value& val2 : json2) array2.push_back(&val2);
-            
-            for(const Json::Value* val1 : array1) {
-                auto match = array2.begin();
-                while(match != array2.end()) {
-                    if(equivalentJson(*val1, **match)) {
-                        break;
-                    }
-                    ++ match;
-                }
-                if(match == array2.end()) {
-                    return false;
-                } else {
-                    array2.erase(match);
-                }
-            }
-            return true;
-        }
-        return false;
-    }
-    
-    if(json1.isObject()) {
-        if(json2.isObject() && json1.size() == json2.size()) {
-            for(Json::ValueConstIterator iter = json1.begin(); iter != json1.end(); ++ iter) {
-                const Json::Value& key = iter.key();
-                const Json::Value& value = *iter;
-                
-                if(!equivalentJson(value, json2[key.asString()])) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        return false;
-    }
-    
-    return false;
-}
+/**
+ * @class Config
+ * @brief Struct holding the config for a single resource project.
+ * Default configuration:
+ *      no obfuscation
+ *      no ignored directories
+ *      output directory is named "__output__" and is a sub-directory of 
+ *          the project's root directory
+ *      previous output not overwritten
+ *      no intermediate directory / no intermediate data used
+ */
+struct Config {
+    bool obfuscate = false;
+    std::vector<boost::filesystem::path> ignoreDirs;
+    boost::filesystem::path outputDir;
+    bool forceOverwriteOutput = false;
+    boost::filesystem::path intermediateDir;
+};
 
 enum ObjectType {
     IMAGE, // Image
@@ -116,6 +74,32 @@ enum ObjectType {
     
     OTHER
 };
+
+/**
+ * @class Object
+ * @brief A single resource to be translated (or not)
+ */
+struct Object {
+    std::string mName;
+    ObjectType mType;
+    boost::filesystem::path mFile;
+    boost::filesystem::path mDebugOrigin;
+    Json::Value mParams;
+
+    // Needed only by intermediate stuff
+    uint32_t mOriginalSize;
+    uint32_t mOriginalHash;
+    bool mSkipTranslate = false;
+    
+    bool mAlwaysRetranslate = false;
+
+    //
+    boost::filesystem::path mOutputFile;
+    uint32_t mOutputSize;
+};
+
+// Useful for debug information, but significantly slows down packaging
+bool n_verbose = true;
 
 // If this returns true, then all files of this type will be re-converted.
 // This is useful for debugging WIP converters.
@@ -237,25 +221,7 @@ ObjectType stringToType(const std::string& str) {
     return OTHER;
 }
 
-struct Package {
-    Package() { }
-    ~Package() { }
-    
-    struct Config {
-        /* Default configuration:
-         *      no obfuscation
-         *      no ignored directories
-         *      output directory is named "__output__" and is a sub-directory of 
-         *          the project's root directory
-         *      previous output not overwritten
-         *      no intermediate directory / no intermediate data used
-         */
-        bool obfuscate = false;
-        std::vector<boost::filesystem::path> ignoreDirs;
-        boost::filesystem::path outputDir;
-        bool forceOverwriteOutput = false;
-        boost::filesystem::path intermediateDir;
-    };
+struct Project {
     
     Config parse_config(boost::filesystem::path file_config) {
         boost::filesystem::path outputDir = m_package_dir / "__output__";
@@ -284,26 +250,6 @@ struct Package {
         return uconf;
     }
     
-    struct Object {
-        std::string mName;
-        ObjectType mType;
-        boost::filesystem::path mFile;
-        boost::filesystem::path mDebugOrigin;
-        Json::Value mParams;
-
-        // Needed only by intermediate stuff
-        uint32_t mOriginalSize;
-        uint32_t mOriginalHash;
-        bool mSkipTranslate = false;
-        
-        bool mAlwaysRetranslate = false;
-
-        //
-        boost::filesystem::path mOutputFile;
-        uint32_t mOutputSize;
-
-    };
-
     boost::filesystem::path m_package_file;
     boost::filesystem::path m_package_dir;
     
@@ -327,7 +273,7 @@ struct Package {
         
         objects.push_back(object);
         
-        if(outputVerbose) {
+        if(n_verbose) {
             std::cout << "Resource: name = " << object.mName << std::endl;
             std::cout << "\ttype = " << typeToString(object.mType) << std::endl;
             std::cout << "\tfile = " << object.mFile << std::endl;
@@ -363,7 +309,7 @@ struct Package {
             else {
                 if(juliet.has_filename() && juliet.extension() == extension) {
                     results.push_back(juliet);
-                    if(outputVerbose) {
+                    if(n_verbose) {
                         std::cout << "\t" << juliet.c_str() << std::endl;
                     }
                 }
@@ -382,7 +328,6 @@ struct Package {
             throw std::runtime_error(sss.str());
         }
         m_package_dir = m_package_file.parent_path();
-        
         m_package_json = readJsonFile(m_package_file.string());
         
         // Try read configuration
@@ -580,7 +525,7 @@ struct Package {
 
                 delete[] totalData;
 
-                if(outputVerbose) {
+                if(n_verbose) {
                     std::cout << "\t" << object.mOriginalHash << std::endl;
                 }
             }
@@ -633,7 +578,7 @@ struct Package {
                         
                         if(checkHash == object.mOriginalHash && checkType == object.mType && equivalentJson(checkParams, object.mParams) && !isWorkInProgressType(object.mType)) {
                             
-                            if(outputVerbose) {
+                            if(n_verbose) {
                                 std::cout << "\tCopy: " << object.mName << std::endl;
                             }
                             object.mSkipTranslate = true;
@@ -675,7 +620,7 @@ struct Package {
             for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
                 Object& object = *iter;
 
-                if(outputVerbose) {
+                if(n_verbose) {
                     std::cout << object.mName << " [" << typeToString(object.mType) << "]" << std::endl;
                 }
 
@@ -683,7 +628,7 @@ struct Package {
                     std::cout << "\t->";
                     
                     // If verbose output is enabled, then the object name has already been printed
-                    if(!outputVerbose) {
+                    if(!n_verbose) {
                         std::cout << " " << object.mName << " [" << typeToString(object.mType) << "]";
                     }
                     std::cout << "..." << std::endl;
@@ -775,8 +720,8 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     
-    Package package;
-    package.process(argv[1]);
+    Project project;
+    project.process(argv[1]);
     Logger::cleanup();
     return 0;
 }

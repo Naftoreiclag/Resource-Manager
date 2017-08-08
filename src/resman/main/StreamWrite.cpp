@@ -16,6 +16,8 @@
 
 #include "StreamWrite.hpp"
 
+namespace resman {
+
 // TODO: allow endianness to be specified to allow for reinterpret_cast<char*>
 // Little endian is enforced for integer types
 
@@ -221,3 +223,5 @@ double deserializeFloat64(uint64_t iInput) { return deserializeFloat(iInput, 64,
         std::cout << readF64(inputData) << std::endl;
     }
 */
+
+} // namespace resman
