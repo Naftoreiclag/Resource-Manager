@@ -23,12 +23,12 @@
 #include <algorithm>
 
 #include <boost/filesystem.hpp>
-
 #include <json/json.h>
-#include "MurmurHash3.h"
+#include "thirdparty/murmurhash3/MurmurHash3.h"
 
-#include "Convert.hpp"
-#include "JsonUtil.hpp"
+#include "logger/Logger.hpp"
+#include "main/Convert.hpp"
+#include "main/JsonUtil.hpp"
 
 #define WIPTYPE GEOMETRY
 
