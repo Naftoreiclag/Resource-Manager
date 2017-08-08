@@ -22,14 +22,14 @@
 
 INITIALIZE_EASYLOGGINGPP
 
-namespace pegr {
+namespace resman {
 namespace Logger {
 
 el::Logger* m_common_logger = nullptr;
 
 void initialize() {
     assert(!m_common_logger);
-    m_common_logger = el::Loggers::getLogger("pegr");
+    m_common_logger = el::Loggers::getLogger("resman");
 }
 void cleanup() {
     assert(m_common_logger);
@@ -47,5 +47,5 @@ el::Logger* alog(const char* addon_name) {
 }
 
 } // namespace Logger
-} // namespace pegr
+} // namespace resman
 
