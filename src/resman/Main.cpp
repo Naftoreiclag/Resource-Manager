@@ -500,8 +500,7 @@ private:
     }
     
     void translate_all_data() {
-        std::cout << "Translating data..." << std::endl;
-        std::cout << std::endl;
+        Logger::log()->info("Translating all resources...");
         boost::filesystem::path intermediateFile = uconf.intermediateDir / "intermediate.data";
         Json::Value intermediateData;
         uint32_t metadataIndex = 0;
@@ -540,46 +539,44 @@ private:
                 if (isWorkInProgressType(object.mType)) {
                     std::cout << "\t(WIP)" << std::endl;
                 }
-                translateData(object, !uconf.obfuscate);
-                {
-                    std::cout << std::endl;
-                    std::ifstream sizeTest(object.mOutputFile.string().c_str(), std::ios::binary | std::ios::ate);
-                    
-                    object.mOutputSize = sizeTest.tellg();
+                try {
+                    translateData(object, !uconf.obfuscate);
+                }
+                catch (std::runtime_error e) {
+                    ++ numFails;
+                    Logger::log()->warn("%v failed to translate: %v", 
+                            object.mName, e.what());
                 }
                 
-                if (boost::filesystem::exists(object.mOutputFile)) {
-                    ++ numUpdates;
-                    if (!uconf.intermediateDir.empty()) {
-                        Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];
+                std::cout << std::endl;
+                std::ifstream sizeTest(object.mOutputFile.string().c_str(), std::ios::binary | std::ios::ate);
+                object.mOutputSize = sizeTest.tellg();
+                ++ numUpdates;
+                if (!uconf.intermediateDir.empty()) {
+                    Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];
 
-                        objectMetadata["hash"] = (Json::Int64) (object.mOriginalHash);
-                        objectMetadata["type"] = object.mType;
-                        objectMetadata["params"] = object.mParams;
+                    objectMetadata["hash"] = (Json::Int64) (object.mOriginalHash);
+                    objectMetadata["type"] = object.mType;
+                    objectMetadata["params"] = object.mParams;
 
-                        std::stringstream ss;
-                        ss << object.mName;
-                        ss << object.mType;
-                        ss << "-";
-                        ss << ((uint32_t) (object.mOriginalHash));
-                        ss << ".i";
-                        std::string intermFilename = ss.str();
+                    std::stringstream ss;
+                    ss << object.mName;
+                    ss << object.mType;
+                    ss << "-";
+                    ss << ((uint32_t) (object.mOriginalHash));
+                    ss << ".i";
+                    std::string intermFilename = ss.str();
 
-                        objectMetadata["file"] = intermFilename;
+                    objectMetadata["file"] = intermFilename;
 
-                        // copy file
-                        boost::filesystem::path copyTo = uconf.intermediateDir / intermFilename;
-                        if (boost::filesystem::exists(copyTo)) {
-                            boost::filesystem::remove(copyTo);
-                        }
-                        boost::filesystem::copy(object.mOutputFile, copyTo);
-
-                        ++ metadataIndex;
+                    // copy file
+                    boost::filesystem::path copyTo = uconf.intermediateDir / intermFilename;
+                    if (boost::filesystem::exists(copyTo)) {
+                        boost::filesystem::remove(copyTo);
                     }
-                }
-                else {
-                    ++ numFails;
-                    std::cout << "ERROR: " << object.mName << " failed to translate!" << std::endl;
+                    boost::filesystem::copy(object.mOutputFile, copyTo);
+
+                    ++ metadataIndex;
                 }
             }
             //
@@ -617,15 +614,78 @@ private:
 public:
 
     bool process(std::string filename) {
-        load_package(filename);
-        load_config();
-        prepare_output_dir();
-        locate_resources();
-        parse_resource_declaration_files();
-        detect_naming_conflicts();
-        determine_final_output_names();
-        use_previous_intermediates();
-        translate_all_data();
+        try {
+            load_package(filename);
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while loading package file: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            load_config();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while loading config: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            prepare_output_dir();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while preparing output dir: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            locate_resources();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while locating resource definitions: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            parse_resource_declaration_files();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while parsing resource declaration files: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            detect_naming_conflicts();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while detecting naming conflicts: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            determine_final_output_names();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while determining final output names: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            use_previous_intermediates();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while using intermediates: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            translate_all_data();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while loading package file: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
     }
 };
 
@@ -644,7 +704,11 @@ int main(int argc, char* argv[]) {
     }
     
     Project project;
-    project.process(argv[1]);
+    try {
+        project.process(argv[1]);
+    } catch (std::runtime_error e) {
+        Logger::log()->fatal(e.what());
+    }
     Logger::cleanup();
     return 0;
 }
