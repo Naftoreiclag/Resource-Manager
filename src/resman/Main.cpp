@@ -15,11 +15,11 @@
  */
 
 #include <fstream>
-#include <iostream>
 #include <sstream>
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <iostream>
 #include <algorithm>
 
 #include <boost/filesystem.hpp>
@@ -189,44 +189,41 @@ private:
         objects.push_back(object);
         
         if (n_verbose) {
-            std::cout << "Resource: name = " << object.mName << std::endl;
-            std::cout << "\ttype = " << object.mType << std::endl;
-            std::cout << "\tfile = " << object.mFile << std::endl;
+            Logger::log()->info("Resource: name = %v", object.mName);
+            Logger::log()->info("\ttype = %v", object.mType);
+            Logger::log()->info("\tfile = %v", object.mFile);
         }
     }
     
-    void recursiveSearch(const boost::filesystem::path& romeo, 
-        const std::string& extension, 
-        std::vector<boost::filesystem::path>& results, 
-        std::vector<boost::filesystem::path>* ignore = 0) {
+    void recursiveSearch(const boost::filesystem::path& root, 
+            const std::string& extension, 
+            std::vector<boost::filesystem::path>& results, 
+            std::vector<boost::filesystem::path>* ignore = nullptr) {
             
-        if (!boost::filesystem::exists(romeo)) {
+        if (!boost::filesystem::exists(root)) {
             return;
         }
         
         boost::filesystem::directory_iterator endIter;
-        for (boost::filesystem::directory_iterator iter(romeo); iter != endIter; ++ iter) {
-            boost::filesystem::path juliet = *iter;
-            if (boost::filesystem::is_directory(juliet)) {
+        for (boost::filesystem::directory_iterator iter(root); iter != endIter; ++ iter) {
+            boost::filesystem::path subdir = *iter;
+            if (boost::filesystem::is_directory(subdir)) {
                 bool search = true;
                 if (ignore) {
                     for (std::vector<boost::filesystem::path>::iterator iter = ignore->begin(); iter != ignore->end(); ++ iter) {
-                        if (boost::filesystem::equivalent(juliet, *iter)) {
+                        if (boost::filesystem::equivalent(subdir, *iter)) {
                             search = false;
                             break;
                         }
                     }
                 }
                 if (search) {
-                    recursiveSearch(juliet, extension, results, ignore);
+                    recursiveSearch(subdir, extension, results, ignore);
                 }
             }
             else {
-                if (juliet.has_filename() && juliet.extension() == extension) {
-                    results.push_back(juliet);
-                    if (n_verbose) {
-                        std::cout << "\t" << juliet.c_str() << std::endl;
-                    }
+                if (subdir.has_filename() && subdir.extension() == extension) {
+                    results.push_back(subdir);
                 }
             }
         }
@@ -250,28 +247,32 @@ private:
         uconf = parse_config(m_package_dir / "compile.config");
         
         // Print configuration data
-        std::cout << "Configuration:" << std::endl;
-        std::cout << "\tOutput dir: " << uconf.outputDir << std::endl;
+        Logger::log()->info("Configuration:");
+        Logger::log()->info("\tOutput dir: %v", uconf.outputDir);
         if (!uconf.intermediateDir.empty()) {
-            std::cout << "\tIntermediate dir: " << uconf.intermediateDir << std::endl;
+            Logger::log()->info("\tIntermediate dir: %v", 
+                    uconf.intermediateDir);
         } else {
-            std::cout << "\tIntermediate data not used" << std::endl;
+            Logger::log()->info("\tIntermediate data not used");
         }
-        std::cout << "\tObfuscation " << (uconf.obfuscate ? "enabled" : "disabled") << std::endl;
-        std::cout << std::endl;
+        if (uconf.obfuscate) {
+            Logger::log()->info("\tObfuscation: enabled");
+        } else {
+            Logger::log()->info("\tObfuscation: disabled");
+        }
     }
     
     void prepare_output_dir() {
         if (boost::filesystem::exists(uconf.outputDir)) {
             if (!uconf.forceOverwriteOutput) {
-                std::cout << "Warning! Output directory " << uconf.outputDir << " already exists!" << std::endl;
+                Logger::log()->warn("Output directory %v already exists!", 
+                        uconf.outputDir);
                 bool decided = false;
                 bool decision;
                 while (!decided) {
-                    std::cout << "Overwrite? (y/n) ";
+                    Logger::log()->info("Overwrite? (y/n)");
                     std::string input;
                     std::cin >> input;
-                    
                     char a = *input.begin();
                     if (a == 'y') {
                         decided = true;
@@ -298,13 +299,12 @@ private:
     }
     
     void locate_resources() {
-        std::cout << "Searching for resources..." << std::endl;
+        Logger::log()->info("Searching for resources...");
         recursiveSearch(m_package_dir, ".resource", objectFiles, &uconf.ignoreDirs);
         recursiveSearch(m_package_dir, ".resources", objectFiles, &uconf.ignoreDirs);
-        std::cout << std::endl;
         
-        std::cout << "Found " << objectFiles.size() << " resource declaration files." << std::endl;
-        std::cout << std::endl;
+        Logger::log()->info("Found %v resource declaration files.",
+                objectFiles.size());
     }
     
     void parse_resource_declaration_files() {
@@ -312,26 +312,48 @@ private:
             boost::filesystem::path& objectFile = *objectFileIter;
             Json::Value objectData = readJsonFile(objectFile.string());
             
+            std::vector<const Json::Value*> to_parse;
             if (objectData.isArray()) {
                 for (Json::ValueIterator valueIter = objectData.begin(); valueIter != objectData.end(); ++ valueIter) {
-                    Json::Value& subData = *valueIter;
+                    const Json::Value& subData = *valueIter;
                     
-                    if (subData.isObject()) {
-                        parseObject(subData, objectFile);
+                    if (!subData.isObject()) {
+                        Logger::log()->warn("Resource declared in %v is not "
+                                "valid, (value = %v)",
+                                objectFile,
+                                subData.toStyledString());
+                        continue;
                     }
-                    else {
-                        std::cout << "Warning! Resource declared in " << objectFile << " is not valid! (value = " << subData.toStyledString() << ")" << std::endl;
-                    }
+                    to_parse.push_back(&subData);
                 }
             }
             else if (objectData.isObject()) {
-                parseObject(objectData, objectFile);
+                to_parse.push_back(&objectData);
             }
             else {
-                std::cout << "Warning! Resource declared at " << objectFile << " is not valid! (value = " << objectData.toStyledString() << ")" << std::endl;
+                Logger::log()->warn("Resource declared in %v is not "
+                        "valid, (value = %v)",
+                        objectFile,
+                        objectData.toStyledString());
+            }
+            
+            for (const Json::Value* json_obj_ptr : to_parse) {
+                const Json::Value& json_obj = *json_obj_ptr;
+                try {
+                    parseObject(json_obj, objectFile);
+                } catch (std::runtime_error e) {
+                    std::stringstream sss;
+                    sss << "Error while parsing resource delcared in "
+                        << objectFile << ": "
+                        << e.what();
+                    Logger::log()->warn("Could not parse resource "
+                            "declared in %v, (value = %v): %v",
+                            objectFile,
+                            json_obj.toStyledString(),
+                            e.what());
+                }
             }
         }
-        std::cout << std::endl;
     }
     
     void detect_naming_conflicts() {
@@ -382,9 +404,8 @@ private:
             throw std::runtime_error(sss.str());
         }
         else {
-            std::cout << "No naming conflicts detected!" << std::endl;
+            Logger::log()->info("No naming conflicts detected!");
         }
-        std::cout << std::endl;
     }
     
     void determine_final_output_names() {
