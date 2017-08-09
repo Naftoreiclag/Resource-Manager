@@ -18,6 +18,8 @@
 
 #include <fstream>
 
+#include "resman/logger/Logger.hpp"
+
 namespace resman {
 
 Json::Value readJsonFile(std::string filename) {
@@ -43,12 +45,17 @@ Json::Value readJsonFile(std::string filename) {
         if (isComment) {
             ss << '\n';
         } else {
-            ss << line;
+            ss << line << '\n';
         }
     }
     fileStream.close();
     
-    ss >> retVal;
+    try {
+        ss >> retVal;
+    } catch (Json::RuntimeError e) {
+        Logger::log()->warn("Failed to parse json file, %v: %v", 
+                filename, e.what());
+    }
     
     return retVal;
 }
