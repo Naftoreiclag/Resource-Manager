@@ -230,6 +230,9 @@ private:
         object.m_src_file = resdef_file.parent_path()
                 / json_obj["file"].asString();
         object.m_params = json_obj["parameters"];
+        if (object.m_params.isNull()) {
+            object.m_params = json_obj["params"];
+        }
         
         const Json::Value& json_retrans = json_obj["always-retranslate"];
         if (!json_retrans.isNull()) {
