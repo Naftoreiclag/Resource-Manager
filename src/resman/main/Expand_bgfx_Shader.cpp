@@ -6,7 +6,7 @@
 
 namespace resman {
     
-std::array<const char*, 7> n_all_shader_platforms = {
+const std::array<const char*, 7> n_all_shader_platforms = {
     "android",
     "asm.js",
     "ios",
