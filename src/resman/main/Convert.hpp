@@ -24,6 +24,7 @@ void convertFont(const Convert_Args& args);
 void convertWaveform(const Convert_Args& args);
 void convertGenericJson(const Convert_Args& args);
 void convertGlsl(const Convert_Args& args);
+void convert_bgfx_shader(const Convert_Args& args);
 
 typedef std::function<void(const Convert_Args&)> Convert_Func;
 

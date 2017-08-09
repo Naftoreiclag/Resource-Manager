@@ -29,14 +29,14 @@
 #include "logger/Logger.hpp"
 #include "main/Convert.hpp"
 #include "main/JsonUtil.hpp"
+#include "main/Common.hpp"
+#include "main/Expand.hpp"
 
 namespace resman {
 
 // Useful for debug information, but significantly slows down packaging
 bool n_verbose = true;
 bool n_clean_output = false;
-
-typedef std::string OType;
 
 bool isWorkInProgressType(const OType& type) {
     return false;
@@ -56,6 +56,8 @@ std::map<OType, Convert_Func> n_converters = {
     
     {"waveform", convertWaveform},
     
+    {"bgfx-shader", convert_bgfx_shader},
+    
     {"vertex-shader", convertGlsl},
     {"tess-control-shader", convertGlsl},
     {"tess-evaluation-shader", convertGlsl},
@@ -65,6 +67,10 @@ std::map<OType, Convert_Func> n_converters = {
     
     {"script", convertMiscellaneous},
     {"string", convertMiscellaneous}
+};
+
+std::map<OType, Expand_Func> n_expanders = {
+    {"bgfx-shader", expand_bgfx_shader}
 };
 
 /**
@@ -83,30 +89,6 @@ struct Config {
     std::vector<boost::filesystem::path> m_ignores;
     boost::filesystem::path m_output_dir;
     boost::filesystem::path m_interm_dir;
-};
-
-/**
- * @class Object
- * @brief A single resource to be translated (or not)
- */
-struct Object {
-    std::string m_name;
-    OType m_type;
-    boost::filesystem::path m_src_file;
-    uint32_t m_src_hash;
-    
-    Json::Value m_params;
-    uint32_t m_params_hash;
-    
-    bool m_skip_retrans = false;
-    bool m_force_retrans = false;
-    
-    boost::filesystem::path m_interm_file;
-
-    boost::filesystem::path m_dest_file;
-    uint32_t m_dest_size;
-    
-    boost::filesystem::path m_dbg_resdef;
 };
 
 void translateData(const Object& object, bool modifyFilename) {
@@ -184,7 +166,7 @@ private:
     
     Json::Value m_package_json;
     
-    std::vector<Object> objects;
+    std::vector<Object> m_objects;
     
     void parse_config(boost::filesystem::path file_config) {
         m_conf.m_output_dir = m_package_dir / "__output__";
@@ -257,7 +239,7 @@ private:
             object.m_force_retrans = true;
         }
         
-        objects.push_back(object);
+        m_objects.push_back(object);
         
         if (n_verbose) {
             Logger::log()->info("Resource: name = %v", object.m_name);
@@ -370,6 +352,42 @@ private:
         }
     }
     
+    void expand_resources() {
+        std::vector<Object> added_objects;
+        for(Object& obj : m_objects) {
+            auto expander_iter = n_expanders.find(obj.m_type);
+            if (expander_iter == n_expanders.end()) {
+                continue;
+            }
+            
+            std::vector<Expansion> expansions = expander_iter->second(obj);
+            
+            if (expansions.size() == 0) {
+                continue;
+            }
+            obj.m_expanded = true;
+            
+            for (Expansion& expansion : expansions) {
+                Object& exp_obj = expansion.m_obj;
+                
+                std::stringstream sss;
+                sss << exp_obj.m_name
+                    << '#'
+                    << expansion.m_subtype;
+                
+                exp_obj.m_name = sss.str();
+                
+                added_objects.emplace_back(std::move(exp_obj));
+            }
+        }
+        m_objects.erase(std::remove_if(m_objects.begin(), m_objects.end(), 
+                [](const Object& obj)->bool{
+                        return obj.m_expanded;
+                }), m_objects.end());
+        std::copy(added_objects.begin(), added_objects.end(), 
+                std::back_inserter(m_objects));
+    }
+    
     void detect_naming_conflicts() {
         typedef std::vector<boost::filesystem::path> PathList;
         typedef std::pair<std::string, PathList> NameObjectListPair;
@@ -377,7 +395,7 @@ private:
         ObjectMap objectMap;
         
         bool foundErrors = false;
-        for (Object& exam : objects) {
+        for (Object& exam : m_objects) {
             PathList* pathList = nullptr;
             for (NameObjectListPair& pair : objectMap) {
                 
@@ -420,7 +438,7 @@ private:
     
     void determine_final_output_names() {
         uint32_t seqName = 0;
-        for (Object& object : objects) {
+        for (Object& object : m_objects) {
             
             boost::filesystem::path outputObjectFile = m_conf.m_output_dir;
             std::stringstream ss;
@@ -477,26 +495,26 @@ private:
         return sss.str();
     }
     
+    Json::Value m_json_interm;
+    boost::filesystem::path m_interm_file;
     void use_previous_intermediates() {
         if (!boost::filesystem::exists(m_conf.m_interm_dir)) {
             boost::filesystem::create_directories(m_conf.m_interm_dir);
         }
         
-        boost::filesystem::path interm_file = m_conf.m_interm_dir 
-                / "intermediate.data";
-        Json::Value json_interm;
-        if (!boost::filesystem::exists(interm_file)) {
-            json_interm["next-idx"] = 0;
+        m_interm_file = m_conf.m_interm_dir / "intermediate.data";
+        if (!boost::filesystem::exists(m_interm_file)) {
+            m_json_interm["next-idx"] = 0;
         } else {
-            json_interm = readJsonFile(interm_file.string());
+            m_json_interm = readJsonFile(m_interm_file.string());
         }
 
         Logger::log()->info("Checking for pre-compiled data...");
 
-        Json::Value& json_metadatas = json_interm["metadata"];
-        Json::Value& json_next_idx = json_interm["next-idx"];
+        Json::Value& json_metadatas = m_json_interm["metadata"];
+        Json::Value& json_next_idx = m_json_interm["next-idx"];
         uint64_t next_idx = json_next_idx.asUInt64();
-        for (Object& object : objects) {
+        for (Object& object : m_objects) {
             hash_file(object.m_src_file, object.m_src_hash);
             hash_json(object.m_params, object.m_params_hash);
             
@@ -513,7 +531,6 @@ private:
              */
             
             std::string interm_code = generate_interm_code(object);
-            
             Json::Value& json_metadata = json_metadatas[interm_code.c_str()];
             
             if (!object.m_force_retrans && !json_metadata.isNull()
@@ -528,8 +545,6 @@ private:
                         / (json_metadata["file"].asString());
                 
             } else {
-                json_metadata["params"] = object.m_params;
-                
                 if (object.m_force_retrans) {
                     boost::filesystem::path old_interm = m_conf.m_interm_dir 
                             / (json_metadata["file"].asString());
@@ -538,7 +553,6 @@ private:
                 
                 std::stringstream sss;
                 sss << next_idx << ".r";
-                json_metadata["file"] = sss.str();
                 
                 object.m_interm_file = m_conf.m_interm_dir / sss.str();
                 
@@ -547,21 +561,10 @@ private:
         }
         
         json_next_idx = next_idx;
-        writeJsonFile(interm_file.string(), json_interm);
     }
     
     void process_all_resources() {
         Logger::log()->info("Processing all resources...");
-        boost::filesystem::path intermediateFile = m_conf.m_interm_dir 
-                / "intermediate.data";
-        Json::Value intermediateData;
-        uint32_t metadataIndex = 0;
-        if (!m_conf.m_interm_dir.empty()) {
-            if (boost::filesystem::exists(intermediateFile)) {
-                intermediateData = readJsonFile(intermediateFile.string());
-                metadataIndex = intermediateData["metadata"].size();
-            }
-        }
 
         uint64_t totalSize = 0;
         uint32_t num_skips = 0;
@@ -573,7 +576,8 @@ private:
         Json::Value& json_res_list = json_output_pkg["resources"];
         uint32_t jsonListIndex = 0;
 
-        for (Object& object : objects) {
+        Json::Value& json_interm_metadatas = m_json_interm["metadata"];
+        for (Object& object : m_objects) {
 
             if (n_verbose) {
                 std::cout << object.m_name << " [" << object.m_type << "]" << std::endl;
@@ -591,14 +595,24 @@ private:
                     translateData(object, !m_conf.m_obfuscate);
                 }
                 catch (std::runtime_error e) {
-                    ++ num_fails;
+                    ++num_fails;
                     Logger::log()->warn("%v failed to translate: %v", 
                             object.m_name, e.what());
+                    continue;
                 }
                 ++num_converts;
             } else {
                 ++num_skips;
             }
+            
+            std::string interm_code = generate_interm_code(object);
+            Json::Value& json_interm_metadata = 
+                    json_interm_metadatas[interm_code.c_str()];
+            json_interm_metadata["params"] = object.m_params;
+            json_interm_metadata["file"] = 
+                    object.m_interm_file.filename().string().c_str();
+            
+            
 
             if (boost::filesystem::exists(object.m_dest_file)) {
                 boost::filesystem::remove(object.m_dest_file);
@@ -610,11 +624,11 @@ private:
                     std::ios::binary | std::ios::ate);
             object.m_dest_size = sizeTest.tellg();
             //
-            Json::Value& objectDef = json_res_list[jsonListIndex];
-            objectDef["name"] = object.m_name;
-            objectDef["type"] = object.m_type;
-            objectDef["file"] = object.m_dest_file.filename().string().c_str();
-            objectDef["size"] = object.m_dest_size;
+            Json::Value& json_obj_def = json_res_list[jsonListIndex];
+            json_obj_def["name"] = object.m_name;
+            json_obj_def["type"] = object.m_type;
+            json_obj_def["file"] = object.m_dest_file.filename().string().c_str();
+            json_obj_def["size"] = object.m_dest_size;
 
             totalSize += object.m_dest_size;
 
@@ -626,19 +640,17 @@ private:
         std::cout << num_fails << " file(s) failed" << std::endl;
         std::cout << std::endl;
 
-        if (!m_conf.m_interm_dir.empty()) {
-            std::cout << "Exporting intermediate.data... ";
-            writeJsonFile(intermediateFile.string(), intermediateData, true);
-            std::cout << "Done!" << std::endl;
-            std::cout << std::endl;
-        }
+        std::cout << "Exporting intermediate.data... ";
+        writeJsonFile(m_interm_file.string(), m_json_interm, true);
+        std::cout << "Done!" << std::endl;
+        std::cout << std::endl;
 
         std::cout << "Exporting data.package... ";
 
         Json::Value& metricsData = json_output_pkg["metrics"];
         metricsData["size"] = (Json::UInt64) totalSize;
         writeJsonFile((m_conf.m_output_dir / "data.package").string(), 
-                json_output_pkg);
+                json_output_pkg, true);
         std::cout << "Done!" << std::endl;
         std::cout << std::endl;
     }
@@ -675,6 +687,14 @@ public:
         } catch (std::runtime_error e) {
             std::stringstream sss;
             sss << "Error while parsing resource declaration files: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            expand_resources();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while expanding resources files: "
                 << e.what();
             throw std::runtime_error(sss.str());
         }
