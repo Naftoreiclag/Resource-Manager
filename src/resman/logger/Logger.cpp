@@ -29,7 +29,13 @@ el::Logger* m_common_logger = nullptr;
 
 void initialize() {
     assert(!m_common_logger);
+    
+    el::Configurations confs;
+    confs.setToDefault();
+    confs.set(el::Level::Info, el::ConfigurationType::Format, "%msg");
+    
     m_common_logger = el::Loggers::getLogger("resman");
+    el::Loggers::reconfigureLogger(m_common_logger, confs);
 }
 void cleanup() {
     assert(m_common_logger);

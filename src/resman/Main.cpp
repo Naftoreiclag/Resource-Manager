@@ -36,6 +36,7 @@ namespace resman {
 
 // Useful for debug information, but significantly slows down packaging
 bool n_verbose = true;
+bool n_reset_interm = false;
 bool n_clean_output = false;
 
 bool isWorkInProgressType(const OType& type) {
@@ -86,6 +87,7 @@ std::map<OType, Expand_Func> n_expanders = {
  */
 struct Config {
     bool m_obfuscate = false;
+    
     std::vector<boost::filesystem::path> m_ignores;
     boost::filesystem::path m_output_dir;
     boost::filesystem::path m_interm_dir;
@@ -158,8 +160,13 @@ void recursiveSearch(const boost::filesystem::path& root,
 }
 
 class Project {
-private:
+public:
     Config m_conf;
+    
+    Project(std::string package)
+    : m_package_file(package) {}
+
+private:
     
     boost::filesystem::path m_package_file;
     boost::filesystem::path m_package_dir;
@@ -244,16 +251,13 @@ private:
         
         m_objects.push_back(object);
         
-        if (n_verbose) {
-            Logger::log()->info("Resource: name = %v", object.m_name);
-            Logger::log()->info("\ttype = %v", object.m_type);
-            Logger::log()->info("\tfile = %v", object.m_src_file);
-        }
+        Logger::log()->verbose(2, "Resource: name = %v", object.m_name);
+        Logger::log()->verbose(2, "\ttype = %v", object.m_type);
+        Logger::log()->verbose(2, "\tfile = %v", object.m_src_file);
     }
     
-    void load_package(const std::string& filename) {
-        Logger::log()->info("Processing: %v", filename);
-        m_package_file = filename;
+    void load_package() {
+        Logger::log()->info("Processing: %v", m_package_file);
         if (!boost::filesystem::exists(m_package_file)) {
             std::stringstream sss;
             sss << "Package file \""
@@ -284,15 +288,19 @@ private:
         }
     }
     
+    void clean_directory(boost::filesystem::path dir) {
+        boost::filesystem::directory_iterator directoryEnd;
+        for (boost::filesystem::directory_iterator 
+                dirIter(dir);
+                dirIter != directoryEnd; ++dirIter) {
+            boost::filesystem::remove_all(*dirIter);
+        }
+    }
+    
     void prepare_output_dir() {
         if (boost::filesystem::exists(m_conf.m_output_dir)) {
             if (n_clean_output) {
-                boost::filesystem::directory_iterator directoryEnd;
-                for (boost::filesystem::directory_iterator 
-                        dirIter(m_conf.m_output_dir);
-                        dirIter != directoryEnd; ++dirIter) {
-                    boost::filesystem::remove_all(*dirIter);
-                }
+                clean_directory(m_conf.m_output_dir);
             }
         }
         boost::filesystem::create_directories(m_conf.m_output_dir);
@@ -368,6 +376,8 @@ private:
             if (expansions.size() == 0) {
                 continue;
             }
+            Logger::log()->verbose(2, "Expanding %v: %v", 
+                    obj.m_type, obj.m_name);
             obj.m_expanded = true;
             
             for (Expansion& expansion : expansions) {
@@ -501,7 +511,11 @@ private:
     Json::Value m_json_interm;
     boost::filesystem::path m_interm_file;
     void use_previous_intermediates() {
-        if (!boost::filesystem::exists(m_conf.m_interm_dir)) {
+        if (boost::filesystem::exists(m_conf.m_interm_dir)) {
+            if (n_reset_interm) {
+                clean_directory(m_conf.m_interm_dir);
+            }
+        } else {
             boost::filesystem::create_directories(m_conf.m_interm_dir);
         }
         
@@ -539,9 +553,7 @@ private:
             if (!object.m_force_retrans && !json_metadata.isNull()
                     && equivalentJson(
                             object.m_params, json_metadata["params"])) {
-                if (n_verbose) {
-                    Logger::log()->info("\tCopy: %v", object.m_name);
-                }
+                Logger::log()->verbose(2, "\tCopy: %v", object.m_name);
                 
                 object.m_skip_retrans = true;
                 object.m_interm_file = m_conf.m_interm_dir 
@@ -582,18 +594,11 @@ private:
         Json::Value& json_interm_metadatas = m_json_interm["metadata"];
         for (Object& object : m_objects) {
 
-            if (n_verbose) {
-                std::cout << object.m_name << " [" << object.m_type << "]" << std::endl;
+            if (object.m_skip_retrans) {
+                ++num_skips;
             }
-
-            if (!object.m_skip_retrans) {
-                std::cout << "\t->";
-                
-                // If verbose output is enabled, then the object name has already been printed
-                if (!n_verbose) {
-                    std::cout << " " << object.m_name << " [" << object.m_type << "]";
-                }
-                std::cout << "..." << std::endl;
+            else {
+                Logger::log()->info("%v [%v]", object.m_name, object.m_type);
                 try {
                     translateData(object, !m_conf.m_obfuscate);
                 }
@@ -604,8 +609,6 @@ private:
                     continue;
                 }
                 ++num_converts;
-            } else {
-                ++num_skips;
             }
             
             std::string interm_code = generate_interm_code(object);
@@ -637,32 +640,28 @@ private:
 
             ++jsonListIndex;
         }
-        std::cout << std::endl;
-        std::cout << num_skips << " file(s) already built" << std::endl;
-        std::cout << num_converts << " file(s) translated" << std::endl;
-        std::cout << num_fails << " file(s) failed" << std::endl;
-        std::cout << std::endl;
+        Logger::log()->info("%v file(s) already built", num_skips);
+        Logger::log()->info("%v file(s) translated", num_converts);
+        Logger::log()->info("%v file(s) failed", num_fails);
 
-        std::cout << "Exporting intermediate.data... ";
+        Logger::log()->info("Exporting intermediate.data... ");
         writeJsonFile(m_interm_file.string(), m_json_interm, true);
-        std::cout << "Done!" << std::endl;
-        std::cout << std::endl;
+        Logger::log()->info("Done!");
 
-        std::cout << "Exporting data.package... ";
+        Logger::log()->info("Exporting data.package... ");
 
         Json::Value& metricsData = json_output_pkg["metrics"];
         metricsData["size"] = (Json::UInt64) totalSize;
         writeJsonFile((m_conf.m_output_dir / "data.package").string(), 
                 json_output_pkg, true);
-        std::cout << "Done!" << std::endl;
-        std::cout << std::endl;
+        Logger::log()->info("Done!");
     }
 
 public:
 
-    bool process(std::string filename) {
+    bool preprocess() {
         try {
-            load_package(filename);
+            load_package();
         } catch (std::runtime_error e) {
             std::stringstream sss;
             sss << "Error while loading package file: "
@@ -677,6 +676,9 @@ public:
                 << e.what();
             throw std::runtime_error(sss.str());
         }
+    }
+
+    bool process() {
         try {
             prepare_output_dir();
         } catch (std::runtime_error e) {
@@ -736,22 +738,90 @@ public:
     }
 };
 
+const char* n_help_text = 
+"Options:\n"
+"   -c, --clean         Cleans the output folder\n"
+"   -r, --reset         Deletes cache (\"intermediate\" folder)\n"
+"   --obfus             Enables obfuscation of output filenames\n"
+"   --nobfus            Disables obfuscation of output filenames\n"
+"   -n <path>           Adds a path to the ignore list when searching\n"
+"   -d <path>           Sets the output path, may overwrite existing contents\n"
+"   -i <path>           Where to place cached files\n"
+"   -v, --verbose       Enables verbose logging"
+;
+
 } // namespace resman
 
 using namespace resman;
 
 int main(int argc, char* argv[]) {
     Logger::initialize();
-    if (argc <= 1) {
-        Logger::log()->warn(
-                "Error: must supply path to package definition file!");
-        Logger::log()->warn("Usage: %v <path to .package file>", argv[0]);
-        return 0;
-    }
-    
-    Project project;
     try {
-        project.process(argv[1]);
+        if (argc < 2) {
+            std::string cmd = "resman";
+            if (argc > 0) {
+                cmd = argv[0];
+            }
+            Logger::log()->info("Usage: %v <package> [options]", cmd);
+            Logger::log()->info(n_help_text);
+            return 0;
+        }
+        
+        std::string package_file = argv[1];
+        
+        Project project(package_file);
+        project.preprocess();
+        
+        for (int i = 2; i < argc; ++i) {
+            if (std::strcmp(argv[i], "--clean") == 0
+                    || std::strcmp(argv[i], "-c") == 0) {
+                Logger::log()->info("Will clean output");
+                n_clean_output = true;
+                continue;
+            }
+            if (std::strcmp(argv[i], "--reset") == 0
+                    || std::strcmp(argv[i], "-r") == 0) {
+                Logger::log()->info("Will reset intermediate folder");
+                n_reset_interm = true;
+                continue;
+            }
+            if (std::strcmp(argv[i], "--obfus") == 0) {
+                project.m_conf.m_obfuscate = true;
+                continue;
+            }
+            if (std::strcmp(argv[i], "--nobfus") == 0) {
+                project.m_conf.m_obfuscate = false;
+                continue;
+            }
+            if (std::strcmp(argv[i], "-n") == 0) {
+                ++i;
+                if (i >= argc) continue;
+                std::string ignore_path = argv[i];
+                project.m_conf.m_ignores.emplace_back(ignore_path);
+                continue;
+            }
+            if (std::strcmp(argv[i], "-d") == 0) {
+                ++i;
+                if (i >= argc) continue;
+                std::string output_path = argv[i];
+                project.m_conf.m_output_dir = output_path;
+                continue;
+            }
+            if (std::strcmp(argv[i], "-i") == 0) {
+                ++i;
+                if (i >= argc) continue;
+                std::string interm_path = argv[i];
+                project.m_conf.m_interm_dir = interm_path;
+                continue;
+            }
+            if (std::strcmp(argv[i], "--verbose") == 0
+                    || std::strcmp(argv[i], "-v") == 0) {
+                n_verbose = true;
+                continue;
+            }
+        }
+        
+        project.process();
     } catch (std::runtime_error e) {
         Logger::log()->fatal(e.what());
     }

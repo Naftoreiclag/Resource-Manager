@@ -3,3 +3,4 @@ ide/*
 *__pycache__*
 example/intermediate/*
 example/output/*
+run/logs/*

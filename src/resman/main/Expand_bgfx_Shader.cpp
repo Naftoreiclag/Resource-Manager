@@ -24,7 +24,6 @@ std::vector<Expansion> expand_bgfx_shader(const Object& obj) {
     if (!json_platform.isNull() && json_platform.asString() != "all") {
         return retval;
     }
-    Logger::log()->info("Expanding bgfx-shader: %v", obj.m_name);
     
     for (const char* shader_platform : n_all_shader_platforms) {
         Expansion expand;

@@ -28,6 +28,8 @@ const std::vector<Alias_bgfx> n_platform_aliases = {
     {{"osx"}, "osx"},
     {{"windows"}, "windows"}
 };
+    
+const boost::filesystem::path n_std_shader_dir = "./bgfx/";
 
 std::string resolve(std::string input, 
         const std::vector<Alias_bgfx>& mapping, const char* dbg_name) {
@@ -64,12 +66,14 @@ void convert_bgfx_shader(const Convert_Args& args) {
     std::string sc_type = 
             resolve(json_type.asString(), n_type_aliases, "shader type");
     
-    
     std::stringstream cmd;
-    cmd << "shaderc -f "
+    cmd << "shaderc"
+        << " -f "
         << args.fromFile.string()
         << " -o "
         << args.outputFile.string()
+        << " -i "
+        << n_std_shader_dir.string()
         << " --platform "
         << sc_platform
         << " --type "
