@@ -35,7 +35,7 @@
 namespace resman {
 
 int32_t n_fversion_major = 0;
-int32_t n_fversion_minor = 2;
+int32_t n_fversion_minor = 3;
 int32_t n_fversion_patch = 0;
     
 void write_format_version(Json::Value& where) {
@@ -67,7 +67,7 @@ std::map<OType, Convert_Func> n_converters = {
     
     {"waveform", convertWaveform},
     
-    {"bgfx-shader", convert_bgfx_shader},
+    {"shader", convert_bgfx_shader},
     
     {"vertex-shader", convertGlsl},
     {"tess-control-shader", convertGlsl},
@@ -599,9 +599,8 @@ private:
         // Append the file provided by user
         Json::Value json_output_pkg;
         write_format_version(json_output_pkg["fversion"]);
-        json_output_pkg["info"] = m_package_json;
+        json_output_pkg["userdata"] = m_package_json;
         Json::Value& json_res_list = json_output_pkg["resources"];
-        uint32_t jsonListIndex = 0;
 
         Json::Value& json_interm_metadatas = m_json_interm["metadata"];
         for (Object& object : m_objects) {
@@ -642,15 +641,13 @@ private:
                     std::ios::binary | std::ios::ate);
             object.m_dest_size = sizeTest.tellg();
             //
-            Json::Value& json_obj_def = json_res_list[jsonListIndex];
-            json_obj_def["name"] = object.m_name;
+            Json::Value& json_obj_def = json_res_list[object.m_name];
             json_obj_def["type"] = object.m_type;
             json_obj_def["file"] = object.m_dest_file.filename().string().c_str();
             json_obj_def["size"] = object.m_dest_size;
 
             totalSize += object.m_dest_size;
 
-            ++jsonListIndex;
         }
         Logger::log()->info("%v file(s) already built", num_skips);
         Logger::log()->info("%v file(s) translated", num_converts);
