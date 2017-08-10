@@ -28,6 +28,8 @@
 
 #include "StreamWrite.hpp"
 
+namespace resman {
+
 void debugAiNode(const aiScene* scene, const aiNode* node, uint32_t depth, bool lastChild) {
 
     char vert = '|';
@@ -35,9 +37,9 @@ void debugAiNode(const aiScene* scene, const aiNode* node, uint32_t depth, bool 
     char conlast = '-';
     
     std::cout << "\t";
-    for(uint32_t c = 0; c < depth; ++ c) {
-        if(c == depth - 1) {
-            if(lastChild) {
+    for (uint32_t c = 0; c < depth; ++ c) {
+        if (c == depth - 1) {
+            if (lastChild) {
                 std::cout << conlast;
             } else {
                 std::cout << con;
@@ -51,23 +53,23 @@ void debugAiNode(const aiScene* scene, const aiNode* node, uint32_t depth, bool 
     std::cout << "[" << node->mName.C_Str() << "]";
 
     // Matrix
-    if(!node->mTransformation.IsIdentity()) {
+    if (!node->mTransformation.IsIdentity()) {
         std::cout << "(T)"; // "T" = "transformed"
     }
     
     uint32_t numMeshes = node->mNumMeshes;
-    if(numMeshes > 0) {
+    if (numMeshes > 0) {
         std::cout << ":";
         std::cout << numMeshes;
         std::cout << "{";
-        for(uint32_t i = 0; i < numMeshes; ++ i) {
+        for (uint32_t i = 0; i < numMeshes; ++ i) {
 
             aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 
             std::cout << "[" << mesh->mName.C_Str() << "]";
 
             // Nice commas
-            if(i != numMeshes - 1) {
+            if (i != numMeshes - 1) {
                 std::cout << ", ";
             }
         }
@@ -78,7 +80,7 @@ void debugAiNode(const aiScene* scene, const aiNode* node, uint32_t depth, bool 
     std::cout << std::endl;
 
     uint32_t numChildren = node->mNumChildren;
-    for(uint32_t i = 0; i < numChildren; ++ i) {
+    for (uint32_t i = 0; i < numChildren; ++ i) {
         debugAiNode(scene, node->mChildren[i], depth + 1, i == numChildren - 1);
     }
 }
@@ -95,10 +97,10 @@ void debugAssimp(const Assimp::Importer& assimp, const aiScene* aScene) {
     std::cout << "\t\tMESHES: " << aScene->mNumMaterials << std::endl;
     std::cout << "\t\tTEXTURES: " << aScene->mNumTextures << std::endl;
     
-    for(uint32_t i = 0; i < aScene->mNumMaterials; ++ i) {
+    for (uint32_t i = 0; i < aScene->mNumMaterials; ++ i) {
         const aiMaterial* aMaterial = aScene->mMaterials[i];
     }
-    for(uint32_t i = 0; i < aScene->mNumMeshes; ++ i) {
+    for (uint32_t i = 0; i < aScene->mNumMeshes; ++ i) {
         const aiMesh* aMesh = aScene->mMeshes[i];
         std::cout << "\tMESH: [" << aMesh->mName.C_Str() << "]" << std::endl;
         std::cout << "\t\tVERTS: " << aMesh->mNumVertices << std::endl;
@@ -110,12 +112,12 @@ void debugAssimp(const Assimp::Importer& assimp, const aiScene* aScene) {
 }
 
 const aiNode* findNodeByLambda(const aiNode* node, std::function<bool(const aiNode*)> func) {
-    if(func(node)) {
+    if (func(node)) {
         return node;
     }
-    for(uint32_t i = 0; i < node->mNumChildren; ++ i) {
+    for (uint32_t i = 0; i < node->mNumChildren; ++ i) {
         const aiNode* search = findNodeByLambda(node->mChildren[i], func);
-        if(search) {
+        if (search) {
             return search;
         }
     }
@@ -134,7 +136,7 @@ const aiNode* findNodeByName(const aiNode* node, std::string name) {
 
 uint32_t findNodeTreeSize(const aiNode* node) {
     uint32_t sum = 1;
-    for(uint32_t i = 0; i < node->mNumChildren; ++ i) {
+    for (uint32_t i = 0; i < node->mNumChildren; ++ i) {
         sum += findNodeTreeSize(node->mChildren[i]);
     }
     return sum;
@@ -262,13 +264,13 @@ struct Mesh {
 };
 
 SkinningTechnique stringToSkinningTechnique(std::string skinning) {
-    if(skinning == "linear-blend") {
+    if (skinning == "linear-blend") {
         return SkinningTechnique::LINEAR_BLEND;
     }
-    else if(skinning == "dual-quaternion") {
+    else if (skinning == "dual-quaternion") {
         return SkinningTechnique::DUAL_QUAT;
     }
-    else if(skinning == "implicit") {
+    else if (skinning == "implicit") {
         return SkinningTechnique::IMPLICIT;
     }
     
@@ -282,10 +284,10 @@ uint8_t skinningTechniqueToByte(SkinningTechnique st) {
 inline void writeBoneBuffer(std::ofstream& outputData, const BoneWeightBuffer& boneBuffer) {
     assert(boneBuffer.size() <= 4);
     uint16_t missingBones = 4 - boneBuffer.size();
-    for(const BoneWeight bw : boneBuffer) writeU8(outputData, bw.id);
-    for(uint16_t i = 0; i < missingBones; ++ i) writeU8(outputData, 0);
-    for(const BoneWeight bw : boneBuffer) writeF32(outputData, bw.weight);
-    for(uint16_t i = 0; i < missingBones; ++ i) writeF32(outputData, 0.f);
+    for (const BoneWeight bw : boneBuffer) writeU8(outputData, bw.id);
+    for (uint16_t i = 0; i < missingBones; ++ i) writeU8(outputData, 0);
+    for (const BoneWeight bw : boneBuffer) writeF32(outputData, bw.weight);
+    for (uint16_t i = 0; i < missingBones; ++ i) writeF32(outputData, 0.f);
 }
 
 void outputMesh(Mesh& output, const boost::filesystem::path& outputFile) {
@@ -303,7 +305,7 @@ void outputMesh(Mesh& output, const boost::filesystem::path& outputFile) {
         useLightprobes << 3
     );
     
-    if(useVertices) {
+    if (useVertices) {
         // Per-vertex data bit flags
         writeU8(outputData,
             output.mUseLocations |
@@ -316,63 +318,63 @@ void outputMesh(Mesh& output, const boost::filesystem::path& outputFile) {
         );
         writeU8(outputData, skinningTechniqueToByte(output.mVertexSkinning));
         writeU32(outputData, output.mVertices.size());
-        for(Vertex& vertex : output.mVertices) {
+        for (Vertex& vertex : output.mVertices) {
             // Every vertex has a fixed size in bytes, allowing for "random access" of vertices if necessary
             
-            if(output.mUseLocations) {
+            if (output.mUseLocations) {
                 writeF32(outputData, vertex.x);
                 writeF32(outputData, vertex.y);
                 writeF32(outputData, vertex.z);
             }
-            if(output.mUseColor) {
+            if (output.mUseColor) {
                 writeF32(outputData, vertex.r);
                 writeF32(outputData, vertex.g);
                 writeF32(outputData, vertex.b);
                 writeF32(outputData, vertex.a);
             }
-            if(output.mUseUV) {
+            if (output.mUseUV) {
                 writeF32(outputData, vertex.u);
                 writeF32(outputData, vertex.v);
             }
-            if(output.mUseNormals) {
+            if (output.mUseNormals) {
                 writeF32(outputData, vertex.nx);
                 writeF32(outputData, vertex.ny);
                 writeF32(outputData, vertex.nz);
             }
-            if(output.mUseTangents) {
+            if (output.mUseTangents) {
                 writeF32(outputData, vertex.tx);
                 writeF32(outputData, vertex.ty);
                 writeF32(outputData, vertex.tz);
             }
-            if(output.mUseBitangents) {
+            if (output.mUseBitangents) {
                 writeF32(outputData, vertex.btx);
                 writeF32(outputData, vertex.bty);
                 writeF32(outputData, vertex.btz);
             }
-            if(output.mUseBoneWeights) {
+            if (output.mUseBoneWeights) {
                 writeBoneBuffer(outputData, vertex.mBoneWeights);
             }
         }
     }
     
-    if(useTriangles) {
+    if (useTriangles) {
         writeU32(outputData, output.mTriangles.size());
-        if(output.mVertices.size() <= 1 << 8) {
-            for(Triangle& triangle : output.mTriangles) {
+        if (output.mVertices.size() <= 1 << 8) {
+            for (Triangle& triangle : output.mTriangles) {
                 writeU8(outputData, (uint8_t) triangle.a);
                 writeU8(outputData, (uint8_t) triangle.b);
                 writeU8(outputData, (uint8_t) triangle.c);
             }
         }
-        else if(output.mVertices.size() <= 1 << 16) {
-            for(Triangle& triangle : output.mTriangles) {
+        else if (output.mVertices.size() <= 1 << 16) {
+            for (Triangle& triangle : output.mTriangles) {
                 writeU16(outputData, (uint16_t) triangle.a);
                 writeU16(outputData, (uint16_t) triangle.b);
                 writeU16(outputData, (uint16_t) triangle.c);
             }
         }
         else {
-            for(Triangle& triangle : output.mTriangles) {
+            for (Triangle& triangle : output.mTriangles) {
                 writeU32(outputData, (uint32_t) triangle.a);
                 writeU32(outputData, (uint32_t) triangle.b);
                 writeU32(outputData, (uint32_t) triangle.c);
@@ -380,33 +382,33 @@ void outputMesh(Mesh& output, const boost::filesystem::path& outputFile) {
         }
     }
     
-    if(useBones) {
+    if (useBones) {
         assert(output.mBones.size() <= 256);
         writeU8(outputData, output.mBones.size() - 1);
-        for(Bone& bone : output.mBones) {
+        for (Bone& bone : output.mBones) {
             // Bones are not fixed in size:
             // - Varying length of bone names
             // - Varying length of child array
             
             writeString(outputData, bone.mName);
             writeBool(outputData, bone.mHasParent);
-            if(bone.mHasParent) writeU8(outputData, bone.mParentIndex);
+            if (bone.mHasParent) writeU8(outputData, bone.mParentIndex);
             writeU8(outputData, bone.mChildren.size());
-            for(uint32_t child : bone.mChildren) writeU8(outputData, child);
+            for (uint32_t child : bone.mChildren) writeU8(outputData, child);
         }
     }
     
-    if(useLightprobes) {
+    if (useLightprobes) {
         assert(output.mLightprobes.size() <= 256);
         writeU8(outputData, skinningTechniqueToByte(output.mLightprobeSkinning));
         writeU8(outputData, output.mLightprobes.size() - 1);
-        for(Lightprobe& lightprobe : output.mLightprobes) {
+        for (Lightprobe& lightprobe : output.mLightprobes) {
             // Lightprobes are also not fixed in size
             writeF32(outputData, lightprobe.x);
             writeF32(outputData, lightprobe.y);
             writeF32(outputData, lightprobe.z);
             writeBool(outputData, lightprobe.mUseBoneWeights);
-            if(lightprobe.mUseBoneWeights) {
+            if (lightprobe.mUseBoneWeights) {
                 writeBoneBuffer(outputData, lightprobe.mBoneWeights);
             }
         }
@@ -438,14 +440,14 @@ uint32_t recursiveBuildBoneStructure(const aiNode* copyFrom, BoneBuffer& bones, 
     bone.mName = copyFrom->mName.C_Str();
 
     bone.mChildren.reserve(copyFrom->mNumChildren);
-    for(uint32_t i = 0; i < copyFrom->mNumChildren; ++ i) {
+    for (uint32_t i = 0; i < copyFrom->mNumChildren; ++ i) {
         bone.mChildren.push_back(recursiveBuildBoneStructure(copyFrom->mChildren[i], bones, boneIndex, true));
     }
     
     return boneIndex;
 }
 
-void convertGeometry(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
+void convertGeometry(const Convert_Args& args) {
     // Importer must be kept alive.
     // Importer destroys imported data upon destruction.
     Assimp::Importer assimp;
@@ -486,116 +488,116 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     // Read from json configuration
     {
         {
-            const Json::Value& jsonMeshName = params["mesh-name"];
-            if(jsonMeshName.isString()) {
+            const Json::Value& jsonMeshName = args.params["mesh-name"];
+            if (jsonMeshName.isString()) {
                 paramMeshNameSpecified = true;
                 paramMeshName = jsonMeshName.asString();
             }
         }
         
         {
-            const Json::Value& jsonPretransform = params["pretransform"];
-            if(jsonPretransform.isBool()) paramPretransform = jsonPretransform.asBool();
+            const Json::Value& jsonPretransform = args.params["pretransform"];
+            if (jsonPretransform.isBool()) paramPretransform = jsonPretransform.asBool();
         }
         
         {
-            const Json::Value& jsonLocations = params["locations"];
-            if(!jsonLocations.isNull()) {
+            const Json::Value& jsonLocations = args.params["locations"];
+            if (!jsonLocations.isNull()) {
                 const Json::Value& jsonRemove = jsonLocations["remove"];
-                if(jsonRemove.isBool()) paramLocationsRemove = jsonRemove.asBool();
+                if (jsonRemove.isBool()) paramLocationsRemove = jsonRemove.asBool();
             }
         }
         
         {
-            const Json::Value& jsonNormals = params["normals"];
-            if(!jsonNormals.isNull()) {
+            const Json::Value& jsonNormals = args.params["normals"];
+            if (!jsonNormals.isNull()) {
                 const Json::Value& jsonGenerate = jsonNormals["generate"];
-                if(jsonGenerate.isBool()) paramNormalsGenerate = jsonGenerate.asBool();
+                if (jsonGenerate.isBool()) paramNormalsGenerate = jsonGenerate.asBool();
                 
                 const Json::Value& jsonRemove = jsonNormals["remove"];
-                if(jsonRemove.isBool()) paramNormalsRemove = jsonRemove.asBool();
+                if (jsonRemove.isBool()) paramNormalsRemove = jsonRemove.asBool();
             }
         }
         
         {
-            const Json::Value& jsonUvs = params["uvs"];
-            if(!jsonUvs.isNull()) {
+            const Json::Value& jsonUvs = args.params["uvs"];
+            if (!jsonUvs.isNull()) {
                 const Json::Value& jsonFlip = jsonUvs["flip"];
-                if(jsonFlip.isBool()) paramUvsFlip = jsonFlip.asBool();
+                if (jsonFlip.isBool()) paramUvsFlip = jsonFlip.asBool();
                 
                 const Json::Value& jsonGenerate = jsonUvs["generate"];
-                if(jsonGenerate.isBool()) paramUvsGenerate = jsonGenerate.asBool();
+                if (jsonGenerate.isBool()) paramUvsGenerate = jsonGenerate.asBool();
                 
                 const Json::Value& jsonRemove = jsonUvs["remove"];
-                if(jsonRemove.isBool()) paramUvsRemove = jsonRemove.asBool();
+                if (jsonRemove.isBool()) paramUvsRemove = jsonRemove.asBool();
             }
         }
         
         {
-            const Json::Value& jsonTangents = params["tangents"];
-            if(!jsonTangents.isNull()) {
+            const Json::Value& jsonTangents = args.params["tangents"];
+            if (!jsonTangents.isNull()) {
                 const Json::Value& jsonGenerate = jsonTangents["generate"];
-                if(jsonGenerate.isBool()) paramTangentsGenerate = jsonGenerate.asBool();
+                if (jsonGenerate.isBool()) paramTangentsGenerate = jsonGenerate.asBool();
                 
                 const Json::Value& jsonRemove = jsonTangents["remove"];
-                if(jsonRemove.isBool()) paramTangentsRemove = jsonRemove.asBool();
+                if (jsonRemove.isBool()) paramTangentsRemove = jsonRemove.asBool();
             }
         }
         
         {
-            const Json::Value& jsonColors = params["colors"];
-            if(!jsonColors.isNull()) {
+            const Json::Value& jsonColors = args.params["colors"];
+            if (!jsonColors.isNull()) {
                 const Json::Value& jsonRemove = jsonColors["remove"];
-                if(jsonRemove.isBool()) paramColorsRemove = jsonRemove.asBool();
+                if (jsonRemove.isBool()) paramColorsRemove = jsonRemove.asBool();
             }
         }
         
         {
-            const Json::Value& jsonBones = params["bone-weights"];
-            if(!jsonBones.isNull()) {
+            const Json::Value& jsonBones = args.params["bone-weights"];
+            if (!jsonBones.isNull()) {
                 const Json::Value& jsonNormalize = jsonBones["normalize"];
-                if(jsonNormalize.isBool()) paramBoneWeightsNormalize = jsonNormalize.asBool();
+                if (jsonNormalize.isBool()) paramBoneWeightsNormalize = jsonNormalize.asBool();
                 
                 const Json::Value& jsonAbsMin = jsonBones["absolute-minimum-weight"];
-                if(jsonAbsMin.isNumeric()) paramBoneWeightsAbsMinWeight = jsonAbsMin.asDouble();
+                if (jsonAbsMin.isNumeric()) paramBoneWeightsAbsMinWeight = jsonAbsMin.asDouble();
                 
                 const Json::Value& jsonSkinning = jsonBones["skinning-technique"];
-                if(jsonSkinning.isString()) {
+                if (jsonSkinning.isString()) {
                     paramBoneWeightsSkinningTechnique = stringToSkinningTechnique(jsonSkinning.asString());
                     paramLightprobesBoneWeightSkinningTechnique = paramBoneWeightsSkinningTechnique;
                 }
                 
                 const Json::Value& jsonRemove = jsonBones["remove"];
-                if(jsonRemove.isBool()) paramBoneWeightsRemove = jsonRemove.asBool();
+                if (jsonRemove.isBool()) paramBoneWeightsRemove = jsonRemove.asBool();
             }
         }
         
         {
-            const Json::Value& jsonLight = params["lightprobes"];
-            if(!jsonLight.isNull()) {
+            const Json::Value& jsonLight = args.params["lightprobes"];
+            if (!jsonLight.isNull()) {
                 const Json::Value& jsonName = jsonLight["mesh-name"];
-                if(jsonName.isString()) {
+                if (jsonName.isString()) {
                     paramLightprobesEnabled = true;
                     paramLightprobesMeshName = jsonName.asString();
                 }
                 
                 const Json::Value& jsonWeights = jsonLight["bone-weights"];
-                if(!jsonWeights.isNull()) {
+                if (!jsonWeights.isNull()) {
                     const Json::Value& jsonNormalize = jsonWeights["normalize"];
-                    if(jsonNormalize.isBool()) paramLightprobesBoneWeightsNormalize = jsonNormalize.asBool();
+                    if (jsonNormalize.isBool()) paramLightprobesBoneWeightsNormalize = jsonNormalize.asBool();
                     
                     const Json::Value& jsonSkinning = jsonWeights["skinning-technique"];
-                    if(jsonSkinning.isString()) paramLightprobesBoneWeightSkinningTechnique = stringToSkinningTechnique(jsonSkinning.asString());
+                    if (jsonSkinning.isString()) paramLightprobesBoneWeightSkinningTechnique = stringToSkinningTechnique(jsonSkinning.asString());
                         
                 }
             }
         }
         
         {
-            const Json::Value& jsonArmature = params["armature"];
-            if(!jsonArmature.isNull()) {
+            const Json::Value& jsonArmature = args.params["armature"];
+            if (!jsonArmature.isNull()) {
                 const Json::Value& jsonRootName = jsonArmature["root-name"];
-                if(jsonRootName.isString()) {
+                if (jsonRootName.isString()) {
                     paramArmatureEnabled = true;
                     paramArmatureRootName = jsonRootName.asString();
                 }
@@ -630,33 +632,33 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     // importFlags |= aiProcess_TransformUVCoords;
     importFlags |= aiProcess_Triangulate;
     importFlags |= aiProcess_ValidateDataStructure;
-    if(paramNormalsGenerate) {
+    if (paramNormalsGenerate) {
         importFlags |= aiProcess_GenSmoothNormals;
         std::cout << "\tGenerating normals" << std::endl;
     }
     
-    if(paramUvsGenerate) {
+    if (paramUvsGenerate) {
         importFlags |= aiProcess_GenUVCoords;
         std::cout << "\tGenerating UVs" << std::endl;
     }
     
-    if(paramTangentsGenerate) {
+    if (paramTangentsGenerate) {
         importFlags |= aiProcess_CalcTangentSpace;
         std::cout << "\tGenerating tangents and bitangents" << std::endl;
     }
     
-    if(paramPretransform) {
+    if (paramPretransform) {
         importFlags |= aiProcess_PreTransformVertices;
         std::cout << "\tPretransforming vertices" << std::endl;
         std::cout << "\tWARNING: Pretransform breaks animation data!" << std::endl;
     }
     
-    if(paramUvsFlip) {
+    if (paramUvsFlip) {
         importFlags |= aiProcess_FlipUVs;
         std::cout << "\tFlipping UVs" << std::endl;
     }
     
-    if(paramFlipWinding) {
+    if (paramFlipWinding) {
         importFlags |= aiProcess_FlipWindingOrder;
         std::cout << "\tFlipping triangle windings" << std::endl;
     }
@@ -665,12 +667,12 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     std::cout << "\tLightprobes " << (paramLightprobesEnabled ? "enabled" : "disabled") << std::endl;
      
     // Import scene
-    const aiScene* aScene = assimp.ReadFile(fromFile.string().c_str(), importFlags);
+    const aiScene* aScene = assimp.ReadFile(args.fromFile.string().c_str(), importFlags);
 
     // Display debug information
     debugAssimp(assimp, aScene);
     
-    if(!aScene->HasMeshes()) {
+    if (!aScene->HasMeshes()) {
         std::cout << "\tERROR: Imported scene has no meshes!" << std::endl;
         return;
     }
@@ -684,14 +686,14 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     const aiMesh* aMesh;
     const aiNode* aMeshNode;
     
-    if(paramMeshNameSpecified) {
+    if (paramMeshNameSpecified) {
         aMeshNode = findNodeByName(aRootNode, paramMeshName);
-        if(!aMeshNode) {
+        if (!aMeshNode) {
             std::cout << "\tERROR: Could not find mesh node named " << paramMeshName << "!" << std::endl;
             return;
         }
         
-        if(aMeshNode->mNumMeshes == 0) {
+        if (aMeshNode->mNumMeshes == 0) {
             std::cout << "\tERROR: Mesh node named " << paramMeshName << " has no meshes!" << std::endl;
             return;
         }
@@ -709,9 +711,9 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     output.mUseBoneWeights = !paramBoneWeightsRemove && aMesh->HasBones();
     
     output.mUseColor = false;
-    if(!paramColorsRemove) {
-        for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
-            if(aMesh->HasVertexColors(i)) {
+    if (!paramColorsRemove) {
+        for (uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
+            if (aMesh->HasVertexColors(i)) {
                 output.mUseColor = true;
                 break;
             }
@@ -719,9 +721,9 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     }
     
     output.mUseUV = false;
-    if(!paramUvsRemove) {
-        for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
-            if(aMesh->HasTextureCoords(i)) {
+    if (!paramUvsRemove) {
+        for (uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
+            if (aMesh->HasTextureCoords(i)) {
                 output.mUseUV = true;
                 break;
             }
@@ -729,7 +731,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     }
     
     output.mVertices.reserve(aMesh->mNumVertices);
-    for(uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
+    for (uint32_t i = 0; i < aMesh->mNumVertices; ++ i) {
 
         // Assimp specification states that these arrays are all mNumVertices in size
 
@@ -737,37 +739,37 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         
         vertex.mIndex = i;
 
-        if(output.mUseLocations) {
+        if (output.mUseLocations) {
             aiVector3D aPos = aMesh->mVertices[i];
             vertex.x = aPos.x;
             vertex.y = aPos.y;
             vertex.z = aPos.z;
         }
-        if(output.mUseColor) {
+        if (output.mUseColor) {
             const aiColor4D& aColor = aMesh->mColors[0][i];
             vertex.r = aColor.r;
             vertex.g = aColor.g;
             vertex.b = aColor.b;
             vertex.a = aColor.a;
         }
-        if(output.mUseNormals) {
+        if (output.mUseNormals) {
             aiVector3D aNormal = aMesh->mNormals[i];
             vertex.nx = aNormal.x;
             vertex.ny = aNormal.y;
             vertex.nz = aNormal.z;
         }
-        if(output.mUseUV) {
+        if (output.mUseUV) {
             const aiVector3D& aUV = aMesh->mTextureCoords[0][i];
             vertex.u = aUV.x;
             vertex.v = aUV.y;
         }
-        if(output.mUseTangents) {
+        if (output.mUseTangents) {
             aiVector3D aTangent = aMesh->mTangents[i];
             vertex.tx = aTangent.x;
             vertex.ty = aTangent.y;
             vertex.tz = aTangent.z;
         }
-        if(output.mUseBitangents) {
+        if (output.mUseBitangents) {
             aiVector3D aBitangent = aMesh->mBitangents[i];
             vertex.btx = aBitangent.x;
             vertex.bty = aBitangent.y;
@@ -779,7 +781,7 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     output.mVertexSkinning = paramBoneWeightsSkinningTechnique;
 
     output.mTriangles.reserve(aMesh->mNumFaces);
-    for(uint32_t i = 0; i < aMesh->mNumFaces; ++ i) {
+    for (uint32_t i = 0; i < aMesh->mNumFaces; ++ i) {
         const aiFace& aFace = aMesh->mFaces[i];
 
         Triangle triangle;
@@ -790,13 +792,13 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         output.mTriangles.push_back(triangle);
     }
 
-    if(paramArmatureEnabled) {
+    if (paramArmatureEnabled) {
         const aiNode* aArmRoot = findNodeByName(aScene->mRootNode, paramArmatureRootName);
         
-        if(aArmRoot) {
+        if (aArmRoot) {
             uint32_t numBones = findNodeTreeSize(aArmRoot);
             
-            if(numBones > 256) {
+            if (numBones > 256) {
                 std::cout << "\tERROR: Armature bone count (" << numBones << ") exceeds max (256)" << std::endl;
             }
             else {
@@ -811,24 +813,24 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         }
     }
 
-    if(output.mUseBoneWeights) {
-        for(uint32_t iBone = 0; iBone < aMesh->mNumBones; ++ iBone) {
+    if (output.mUseBoneWeights) {
+        for (uint32_t iBone = 0; iBone < aMesh->mNumBones; ++ iBone) {
             const aiBone* aBone = aMesh->mBones[iBone];
             // Each aiBone is really more of a pointer into the bone array by name..?
             
             // Find the index of the appropriate bone
             std::string boneName = aBone->mName.C_Str();
             uint8_t boneIndex;
-            for(boneIndex = 0; boneIndex < output.mBones.size(); ++ boneIndex) {
+            for (boneIndex = 0; boneIndex < output.mBones.size(); ++ boneIndex) {
                 const Bone& bone = output.mBones.at(boneIndex);
-                if(bone.mName == boneName) {
+                if (bone.mName == boneName) {
                     break;
                 }
             }
-            if(boneIndex == output.mBones.size()) {
+            if (boneIndex == output.mBones.size()) {
                 std::cout << "\tERROR: Could not find bone named: " << boneName << std::endl;
             } else {
-                for(uint32_t iWeight = 0; iWeight < aBone->mNumWeights; ++ iWeight) {
+                for (uint32_t iWeight = 0; iWeight < aBone->mNumWeights; ++ iWeight) {
                     const aiVertexWeight& aWeight = aBone->mWeights[iWeight];
                     Vertex& vert = output.mVertices.at(aWeight.mVertexId);
                     BoneWeight weight;
@@ -841,18 +843,18 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
         
         // Sort bone weights by influence (descending order)
         // Normalize if requested
-        for(Vertex& vertex : output.mVertices) {
+        for (Vertex& vertex : output.mVertices) {
             
             BoneWeightBuffer& boneWeights = vertex.mBoneWeights;
             
             // Skip procesing on any vertex not affected by bones
-            if(boneWeights.size() > 0) {
+            if (boneWeights.size() > 0) {
                 // Exclude any weights that are less than the given minimum
-                if(paramBoneWeightsAbsMinWeight > 0.0) {
-                    boneWeights.erase(std::remove_if(
+                if (paramBoneWeightsAbsMinWeight > 0.0) {
+                    boneWeights.erase(std::remove_if (
                         boneWeights.begin(), boneWeights.end(),
                         [paramBoneWeightsAbsMinWeight](const BoneWeight& bw) -> bool {
-                            if(bw.weight < 0.0) {
+                            if (bw.weight < 0.0) {
                                 return -bw.weight < paramBoneWeightsAbsMinWeight;
                             } else {
                                 return bw.weight < paramBoneWeightsAbsMinWeight;
@@ -871,20 +873,20 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
                 );
                     
                 // Make sure that maximum influence count does not exceed maximum
-                if(boneWeights.size() > 4) {
+                if (boneWeights.size() > 4) {
                     std::cout << "\tWARNING: Vertex " << vertex.mIndex << " has " << boneWeights.size() << " > 4 bones" << std::endl;
                     
                     // Restore original total weight (unless normalization is specified, in which case the total weight is 1)
-                    if(!paramBoneWeightsNormalize) {
+                    if (!paramBoneWeightsNormalize) {
                         double lostWeight = 0.0;
                         uint32_t index = 0;
-                        for(BoneWeight bw : boneWeights) {
-                            if(index >= 4) lostWeight += bw.weight;
+                        for (BoneWeight bw : boneWeights) {
+                            if (index >= 4) lostWeight += bw.weight;
                             ++ index;
                         }
                         boneWeights.resize(4);
                         lostWeight /= 4.0;
-                        for(BoneWeight& bw : boneWeights) {
+                        for (BoneWeight& bw : boneWeights) {
                             bw.weight += lostWeight;
                         }
                     } else {
@@ -893,15 +895,15 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
                 }
                 
                 // Normalization if requested (sets the total weight for the bones to be one)
-                if(paramBoneWeightsNormalize) {
+                if (paramBoneWeightsNormalize) {
                     double totalWeight = 0.0;
-                    for(BoneWeight bw : boneWeights) {
+                    for (BoneWeight bw : boneWeights) {
                         totalWeight += bw.weight;
                     }
                     
                     // Avoid division by zero
-                    if(totalWeight != 0.0) {
-                        for(BoneWeight bw : boneWeights) {
+                    if (totalWeight != 0.0) {
+                        for (BoneWeight bw : boneWeights) {
                             bw.weight /= totalWeight;
                         }
                     } else {
@@ -921,9 +923,11 @@ void convertGeometry(const boost::filesystem::path& fromFile, const boost::files
     std::cout << "\tBones: " << output.mBones.size() << std::endl;
     std::cout << "\tLightprobes: " << output.mLightprobes.size() << std::endl;
     
-    outputMesh(output, outputFile);
+    outputMesh(output, args.outputFile);
     
     // Debug
-    outputMesh(output, fromFile.parent_path() / "debug_geometry");
+    //outputMesh(output, args.fromFile.parent_path() / "debug_geometry");
 }
+
+} // namespace resman
 

@@ -15,763 +15,816 @@
  */
 
 #include <fstream>
-#include <iostream>
 #include <sstream>
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 #include <vector>
+#include <iostream>
 #include <algorithm>
 
 #include <boost/filesystem.hpp>
 #include <json/json.h>
-#include "thirdparty/murmurhash3/MurmurHash3.h"
+#include <MurmurHash3.h>
 
 #include "logger/Logger.hpp"
 #include "main/Convert.hpp"
 #include "main/JsonUtil.hpp"
+#include "main/Common.hpp"
+#include "main/Expand.hpp"
 
-#define WIPTYPE GEOMETRY
+namespace resman {
 
 // Useful for debug information, but significantly slows down packaging
-bool outputVerbose = false;
+bool n_verbose = true;
+bool n_reset_interm = false;
+bool n_clean_output = false;
 
-// Might not be perfect
-// This is unbelievably slow. Use only for comparing json structures of limited size
-bool equivalentJson(const Json::Value& json1, const Json::Value& json2) {
-    if(json1.isNull()) return json2.isNull();
-    if(json1.isBool()) return json2.isBool() && json1.asBool() == json2.asBool();
-    if(json1.isUInt64() && json2.isUInt64()) return json1.asUInt64() == json2.asUInt64();
-    if(json1.isInt64() && json2.isInt64()) return json1.asInt64() == json2.asInt64();
-    if(json1.isUInt() && json2.isUInt()) return json1.asUInt() == json2.asUInt();
-    if(json1.isInt() && json2.isInt()) return json1.asInt() == json2.asInt();
-    if(json1.isDouble() && json2.isDouble()) return json1.asDouble() == json2.asDouble();
-    if(json1.isNumeric()) return json2.isNumeric() && json1.asDouble() == json2.asDouble();
-    if(json1.isString()) return json2.isString() && json1.asString() == json2.asString();
-    
-    if(json1.isArray()) {
-        if(json2.isArray() && json1.size() == json2.size()) {
-            std::vector<const Json::Value*> array1;
-            std::vector<const Json::Value*> array2;
-            
-            for(const Json::Value& val1 : json1) array1.push_back(&val1);
-            for(const Json::Value& val2 : json2) array2.push_back(&val2);
-            
-            for(const Json::Value* val1 : array1) {
-                auto match = array2.begin();
-                while(match != array2.end()) {
-                    if(equivalentJson(*val1, **match)) {
-                        break;
-                    }
-                    ++ match;
-                }
-                if(match == array2.end()) {
-                    return false;
-                } else {
-                    array2.erase(match);
-                }
-            }
-            return true;
-        }
-        return false;
-    }
-    
-    if(json1.isObject()) {
-        if(json2.isObject() && json1.size() == json2.size()) {
-            for(Json::ValueConstIterator iter = json1.begin(); iter != json1.end(); ++ iter) {
-                const Json::Value& key = iter.key();
-                const Json::Value& value = *iter;
-                
-                if(!equivalentJson(value, json2[key.asString()])) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        return false;
-    }
-    
+bool isWorkInProgressType(const OType& type) {
     return false;
 }
 
-enum ObjectType {
-    IMAGE, // Image
-    MATERIAL, // Generic Json
-    MODEL, // Generic Json
-    COMPUTE_SHADER,
-    VERTEX_SHADER,
-    TESS_CONTROL_SHADER,
-    TESS_EVALUATION_SHADER,
-    GEOMETRY_SHADER,
-    FRAGMENT_SHADER,
-    SHADER_PROGRAM, // Generic Json
-    STRING,
-    TEXTURE, // Generic Json
-    GEOMETRY, // Geometry
-    FONT, // Font
-    WAVEFORM, // Waveform
-    SCRIPT,
-    COMPONENT,
-    COMPOSITION,
-
+std::map<OType, Convert_Func> n_converters = {
+    {"material", convertGenericJson},
+    {"model", convertGenericJson},
+    {"shader-program", convertGenericJson},
+    {"texture", convertGenericJson},
     
-    OTHER
+    {"image", convertImage},
+    
+    {"geometry", convertGeometry},
+    
+    {"font", convertFont},
+    
+    {"waveform", convertWaveform},
+    
+    {"bgfx-shader", convert_bgfx_shader},
+    
+    {"vertex-shader", convertGlsl},
+    {"tess-control-shader", convertGlsl},
+    {"tess-evaluation-shader", convertGlsl},
+    {"geometry-shader", convertGlsl},
+    {"fragment-shader", convertGlsl},
+    {"compute-shader", convertGlsl},
+    
+    {"script", convertMiscellaneous},
+    {"string", convertMiscellaneous}
 };
 
-// If this returns true, then all files of this type will be re-converted.
-// This is useful for debugging WIP converters.
-bool isWorkInProgressType(const ObjectType& type) {
-    return false;
-    //return type == WIPTYPE;
-    //return type == VERTEX_SHADER || type == TESS_CONTROL_SHADER || type == TESS_EVALUATION_SHADER || type == GEOMETRY_SHADER || type == FRAGMENT_SHADER || type == COMPUTE_SHADER;
+std::map<OType, Expand_Func> n_expanders = {
+    {"bgfx-shader", expand_bgfx_shader}
+};
+
+/**
+ * @class Config
+ * @brief Struct holding the config for a single resource project.
+ * Default configuration:
+ *      no obfuscation
+ *      no ignored directories
+ *      output directory is named "__output__" and is a sub-directory of 
+ *          the project's root directory
+ *      previous output not overwritten
+ *      no intermediate directory / no intermediate data used
+ */
+struct Config {
+    bool m_obfuscate = false;
+    
+    std::vector<boost::filesystem::path> m_ignores;
+    boost::filesystem::path m_output_dir;
+    boost::filesystem::path m_interm_dir;
+};
+
+void translateData(const Object& object, bool modifyFilename) {
+    if (!boost::filesystem::exists(object.m_src_file)) {
+        std::stringstream sss;
+        sss << "File does not exist: "
+            << object.m_src_file.filename();
+        throw std::runtime_error(sss.str());
+    }
+    
+    auto pair_ptr = n_converters.find(object.m_type);
+    
+    if (pair_ptr == n_converters.end()) {
+        std::stringstream sss;
+        sss << "Unknown type: \""
+            << object.m_type
+            << "\"";
+        throw std::runtime_error(sss.str());
+    }
+    
+    Convert_Args args;
+    args.fromFile = object.m_src_file;
+    args.outputFile = object.m_interm_file;
+    args.modifyFilename = modifyFilename;
+    args.params = object.m_params;
+    
+    Convert_Func& converter = pair_ptr->second;
+    converter(args);
+    
+    if (boost::filesystem::exists(object.m_dest_file)) {
+        boost::filesystem::remove(object.m_dest_file);
+    }
+    boost::filesystem::copy(object.m_interm_file, object.m_dest_file);
 }
 
-void translateData(const ObjectType& otype, const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, uint32_t& filesize, const Json::Value& params, bool modifyFilename) {
-    if(!boost::filesystem::exists(fromFile)) {
-        std::cout << "\tERROR: File does not exist: " << fromFile.filename() << std::endl;
+void recursiveSearch(const boost::filesystem::path& root, 
+        const std::string& extension, 
+        std::vector<boost::filesystem::path>& results, 
+        const std::vector<boost::filesystem::path>& ignore_list) {
+        
+    if (!boost::filesystem::exists(root)) {
         return;
     }
     
-    switch(otype) {
-        case MATERIAL:
-        case MODEL:
-        case SHADER_PROGRAM:
-        case TEXTURE: {
-            convertGenericJson(fromFile, outputFile, params, modifyFilename);
-            break;
+    boost::filesystem::directory_iterator iter_end;
+    for (boost::filesystem::directory_iterator iter(root); 
+            iter != iter_end; ++iter) {
+        boost::filesystem::path subdir = *iter;
+        if (boost::filesystem::is_directory(subdir)) {
+            bool ignore = false;
+            for (const boost::filesystem::path& ignored_dir : ignore_list) {
+                if (boost::filesystem::equivalent(subdir, ignored_dir)) {
+                    ignore = true;
+                    break;
+                }
+            }
+            if (!ignore) {
+                recursiveSearch(subdir, extension, results, ignore_list);
+            }
         }
-        case IMAGE: {
-            convertImage(fromFile, outputFile, params, modifyFilename);
-            break;
+        else {
+            if (subdir.has_filename() && subdir.extension() == extension) {
+                results.push_back(subdir);
+            }
         }
-        case GEOMETRY: {
-            convertGeometry(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
-        case FONT: {
-            convertFont(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
-        case WAVEFORM: {
-            convertWaveform(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
-        case VERTEX_SHADER:
-        case TESS_CONTROL_SHADER:
-        case TESS_EVALUATION_SHADER:
-        case GEOMETRY_SHADER:
-        case FRAGMENT_SHADER:
-        case COMPUTE_SHADER: {
-            convertGlsl(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
-        default: {
-            convertMiscellaneous(fromFile, outputFile, params, modifyFilename);
-            break;
-        }
-    }
-    std::cout << std::endl;
-    std::ifstream sizeTest(outputFile.string().c_str(), std::ios::binary | std::ios::ate);
-    filesize = sizeTest.tellg();
-}
-
-std::string typeToString(const ObjectType& tpe) {
-    switch(tpe) {
-        case IMAGE: return "image";
-        case MATERIAL: return "material";
-        case MODEL: return "model";
-        case COMPUTE_SHADER: return "compute-shader";
-        case VERTEX_SHADER: return "vertex-shader";
-        case TESS_CONTROL_SHADER: return "tess-control-shader";
-        case TESS_EVALUATION_SHADER: return "tess-evaluation-shader";
-        case GEOMETRY_SHADER: return "geometry-shader";
-        case FRAGMENT_SHADER: return "fragment-shader";
-        case SHADER_PROGRAM: return "shader-program";
-        case STRING: return "string";
-        case TEXTURE: return "texture";
-        case GEOMETRY: return "geometry";
-        case FONT: return "font";
-        case WAVEFORM: return "waveform";
-        case SCRIPT: return "script";
-        case COMPONENT: return "component";
-        case COMPOSITION: return "composition";
-        default: return "other";
     }
 }
 
-ObjectType stringToType(const std::string& str) {
-    if(str == "image") {
-        return IMAGE;
-    } else if(str == "material") {
-        return MATERIAL;
-    } else if(str == "model") {
-        return MODEL;
-    } else if(str == "compute-shader") {
-        return COMPUTE_SHADER;
-    } else if(str == "vertex-shader") {
-        return VERTEX_SHADER;
-    } else if(str == "tess-control-shader") {
-        return TESS_CONTROL_SHADER;
-    } else if(str == "tess-evaluation-shader") {
-        return TESS_EVALUATION_SHADER;
-    } else if(str == "geometry-shader") {
-        return GEOMETRY_SHADER;
-    } else if(str == "fragment-shader") {
-        return FRAGMENT_SHADER;
-    } else if(str == "shader-program") {
-        return SHADER_PROGRAM;
-    } else if(str == "string") {
-        return STRING;
-    } else if(str == "texture") {
-        return TEXTURE;
-    } else if(str == "geometry") {
-        return GEOMETRY;
-    } else if(str == "font") {
-        return FONT;
-    } else if(str == "waveform") {
-        return WAVEFORM;
-    } else if(str == "script") {
-        return SCRIPT;
-    } else if(str == "component") {
-        return COMPONENT;
-    } else if(str == "composition") {
-        return COMPOSITION;
-    }
-    return OTHER;
-}
-        
-class Package {
+class Project {
 public:
-    Package() { }
-    ~Package() { }
+    Config m_conf;
     
-    // You won't see this in Java!
-    struct Object {
-        std::string mName;
-        ObjectType mType;
-        boost::filesystem::path mFile;
-        boost::filesystem::path mDebugOrigin;
-        Json::Value mParams;
+    Project(std::string package)
+    : m_package_file(package) {}
 
-        // Needed only by intermediate stuff
-        uint32_t mOriginalSize;
-        uint32_t mOriginalHash;
-        bool mSkipTranslate = false;
-        
-        bool mAlwaysRetranslate = false;
-
-        //
-        boost::filesystem::path mOutputFile;
-        uint32_t mOutputSize;
-
-    };
-
-    boost::filesystem::path mFile;
-    boost::filesystem::path mDir;
+private:
     
-    Json::Value mPackageJson;
+    boost::filesystem::path m_package_file;
+    boost::filesystem::path m_package_dir;
     
-    std::vector<Object> objects;
+    Json::Value m_package_json;
     
-    void parseObject(const Json::Value& objectData, const boost::filesystem::path& objectFile) {
-        Object object;
-        object.mDebugOrigin = objectFile;
-        object.mName = objectData["name"].asString();
-        object.mType = stringToType(objectData["type"].asString());
-        object.mAlwaysRetranslate = objectData["always-retranslate"].asBool();
-        object.mParams = objectData["parameters"];
-        if(object.mType == OTHER) {
-            std::cout << "Warning! Unknown resource type " << objectData["type"].asString() << " found in resource " << object.mName << " found at " << object.mDebugOrigin << std::endl;
-        }
-        
-        boost::filesystem::path newPath = objectFile;
-        object.mFile = newPath.remove_filename() / objectData["file"].asString();
-        
-        objects.push_back(object);
-        
-        if(outputVerbose) {
-            std::cout << "Resource: name = " << object.mName << std::endl;
-            std::cout << "\ttype = " << typeToString(object.mType) << std::endl;
-            std::cout << "\tfile = " << object.mFile << std::endl;
-        }
-    }
+    std::vector<Object> m_objects;
     
-    void recursiveSearch(const boost::filesystem::path& romeo, 
-        const std::string& extension, 
-        std::vector<boost::filesystem::path>& results, 
-        std::vector<boost::filesystem::path>* ignore = 0) {
-            
-        if(!boost::filesystem::exists(romeo)) {
+    void parse_config(boost::filesystem::path file_config) {
+        m_conf.m_output_dir = m_package_dir / "__output__";
+        m_conf.m_interm_dir = m_package_dir / "__interm__";
+        
+        if (!boost::filesystem::exists(file_config)) {
             return;
         }
+        Json::Value json_config = readJsonFile(file_config.string());
         
-        boost::filesystem::directory_iterator endIter;
-        for(boost::filesystem::directory_iterator iter(romeo); iter != endIter; ++ iter) {
-            boost::filesystem::path juliet = *iter;
-            if(boost::filesystem::is_directory(juliet)) {
-                bool search = true;
-                if(ignore) {
-                    for(std::vector<boost::filesystem::path>::iterator iter = ignore->begin(); iter != ignore->end(); ++ iter) {
-                        if(boost::filesystem::equivalent(juliet, *iter)) {
-                            search = false;
-                            break;
-                        }
+        Json::Value& json_output = json_config["output"];
+        if (!json_output.isNull()) {                
+            m_conf.m_output_dir = m_package_dir / (json_output.asString());
+        }
+        
+        Json::Value& json_obfuscate = json_config["obfuscate"];
+        if (!json_obfuscate.isNull()) {
+            m_conf.m_obfuscate = json_obfuscate.asBool();
+        }
+
+        Json::Value& json_interm = json_config["intermediate"];
+        if (!json_interm.isNull()) {
+            m_conf.m_interm_dir = m_package_dir / (json_interm.asString());
+        }
+        
+        Json::Value& json_ignore_list = json_config["ignore"];
+        if (!json_ignore_list.isNull()) {
+            for (Json::Value& ignore : json_ignore_list) {
+                m_conf.m_ignores.push_back(m_package_dir / (ignore.asString()));
+            }
+        }
+    }
+    
+    void verify_obj_field(const char* field,
+            const Json::Value& json_obj, 
+            const boost::filesystem::path& resdef_file) {
+        if (json_obj[field].isNull()) {
+            std::stringstream sss;
+            sss << "\""
+                << field
+                << "\" not specified in resource declared in "
+                << resdef_file
+                << " (value = "
+                << json_obj.toStyledString()
+                << ")";
+            throw std::runtime_error(sss.str());
+        }
+    }
+    
+    void process_resource(const Json::Value& json_obj, 
+            const boost::filesystem::path& resdef_file) {
+        Object object;
+        object.m_dbg_resdef = resdef_file;
+        
+        verify_obj_field("name", json_obj, resdef_file);
+        verify_obj_field("type", json_obj, resdef_file);
+        verify_obj_field("file", json_obj, resdef_file);
+        
+        object.m_name = json_obj["name"].asString();
+        object.m_type = json_obj["type"].asString();
+        object.m_src_file = resdef_file.parent_path()
+                / json_obj["file"].asString();
+        object.m_params = json_obj["parameters"];
+        if (object.m_params.isNull()) {
+            object.m_params = json_obj["params"];
+        }
+        
+        const Json::Value& json_retrans = json_obj["always-retranslate"];
+        if (!json_retrans.isNull()) {
+            object.m_force_retrans = json_retrans.asBool();
+        }
+        if (isWorkInProgressType(object.m_type)) {
+            object.m_force_retrans = true;
+        }
+        
+        m_objects.push_back(object);
+        
+        Logger::log()->verbose(2, "Resource: name = %v", object.m_name);
+        Logger::log()->verbose(2, "\ttype = %v", object.m_type);
+        Logger::log()->verbose(2, "\tfile = %v", object.m_src_file);
+    }
+    
+    void load_package() {
+        Logger::log()->info("Processing: %v", m_package_file);
+        if (!boost::filesystem::exists(m_package_file)) {
+            std::stringstream sss;
+            sss << "Package file \""
+                << m_package_file << "\" does not exist!";
+            throw std::runtime_error(sss.str());
+        }
+        m_package_dir = m_package_file.parent_path();
+        m_package_json = readJsonFile(m_package_file.string());
+    }
+    
+    void load_config() {
+        // Try read configuration
+        parse_config(m_package_dir / "compile.config");
+        
+        // Print configuration data
+        Logger::log()->info("Configuration:");
+        Logger::log()->info("\tOutput dir: %v", m_conf.m_output_dir);
+        if (!m_conf.m_interm_dir.empty()) {
+            Logger::log()->info("\tIntermediate dir: %v", 
+                    m_conf.m_interm_dir);
+        } else {
+            Logger::log()->info("\tIntermediate data not used");
+        }
+        if (m_conf.m_obfuscate) {
+            Logger::log()->info("\tObfuscation: enabled");
+        } else {
+            Logger::log()->info("\tObfuscation: disabled");
+        }
+    }
+    
+    void clean_directory(boost::filesystem::path dir) {
+        boost::filesystem::directory_iterator directoryEnd;
+        for (boost::filesystem::directory_iterator 
+                dirIter(dir);
+                dirIter != directoryEnd; ++dirIter) {
+            boost::filesystem::remove_all(*dirIter);
+        }
+    }
+    
+    void prepare_output_dir() {
+        if (boost::filesystem::exists(m_conf.m_output_dir)) {
+            if (n_clean_output) {
+                clean_directory(m_conf.m_output_dir);
+            }
+        }
+        boost::filesystem::create_directories(m_conf.m_output_dir);
+    }
+    
+    void parse_resource_declaration_files() {
+        std::vector<boost::filesystem::path> decl_files;
+        
+        Logger::log()->info("Searching for resources...");
+        recursiveSearch(m_package_dir, 
+                ".resource", decl_files, m_conf.m_ignores);
+        recursiveSearch(m_package_dir, 
+                ".resources", decl_files, m_conf.m_ignores);
+        
+        Logger::log()->info("Found %v resource declaration files.",
+                decl_files.size());
+        
+        for (boost::filesystem::path& res_decl_file : decl_files) {
+            Json::Value json_res_decl = readJsonFile(res_decl_file.string());
+            
+            std::vector<const Json::Value*> to_parse;
+            if (json_res_decl.isArray()) {
+                for (const Json::Value& subData : json_res_decl) {
+                    if (!subData.isObject()) {
+                        Logger::log()->warn("Resource declared in %v is not "
+                                "valid, (value = %v)",
+                                res_decl_file,
+                                subData.toStyledString());
+                        continue;
                     }
-                }
-                if(search) {
-                    recursiveSearch(juliet, extension, results, ignore);
+                    to_parse.push_back(&subData);
                 }
             }
+            else if (json_res_decl.isObject()) {
+                to_parse.push_back(&json_res_decl);
+            }
             else {
-                if(juliet.has_filename() && juliet.extension() == extension) {
-                    results.push_back(juliet);
-                    if(outputVerbose) {
-                        std::cout << "\t" << juliet.c_str() << std::endl;
-                    }
+                Logger::log()->warn("Resource declared in %v is not "
+                        "valid, (value = %v)",
+                        res_decl_file,
+                        json_res_decl.toStyledString());
+            }
+            
+            for (const Json::Value* json_obj_ptr : to_parse) {
+                const Json::Value& json_obj = *json_obj_ptr;
+                try {
+                    process_resource(json_obj, res_decl_file);
+                } catch (std::runtime_error e) {
+                    std::stringstream sss;
+                    sss << "Error while parsing resource delcared in "
+                        << res_decl_file << ": "
+                        << e.what();
+                    Logger::log()->warn("Could not parse resource "
+                            "declared in %v, (value = %v): %v",
+                            res_decl_file,
+                            json_obj.toStyledString(),
+                            e.what());
                 }
             }
         }
     }
     
-    // 
-    bool process(std::string filename) {
-        std::cout << "Processing: " << filename << std::endl;
-        mFile = filename;
-        if(!boost::filesystem::exists(mFile)) {
-            std::cout << "Package file does not exist!" << std::endl;
-            return false;
+    void expand_resources() {
+        std::vector<Object> added_objects;
+        for(Object& obj : m_objects) {
+            auto expander_iter = n_expanders.find(obj.m_type);
+            if (expander_iter == n_expanders.end()) {
+                continue;
+            }
+            
+            std::vector<Expansion> expansions = expander_iter->second(obj);
+            
+            if (expansions.size() == 0) {
+                continue;
+            }
+            Logger::log()->verbose(2, "Expanding %v: %v", 
+                    obj.m_type, obj.m_name);
+            obj.m_expanded = true;
+            
+            for (Expansion& expansion : expansions) {
+                Object& exp_obj = expansion.m_obj;
+                
+                std::stringstream sss;
+                sss << exp_obj.m_name
+                    << '#'
+                    << expansion.m_subtype;
+                
+                exp_obj.m_name = sss.str();
+                
+                added_objects.emplace_back(std::move(exp_obj));
+            }
+        }
+        m_objects.erase(std::remove_if(m_objects.begin(), m_objects.end(), 
+                [](const Object& obj)->bool{
+                        return obj.m_expanded;
+                }), m_objects.end());
+        std::copy(added_objects.begin(), added_objects.end(), 
+                std::back_inserter(m_objects));
+    }
+    
+    void detect_naming_conflicts() {
+        typedef std::vector<boost::filesystem::path> PathList;
+        typedef std::pair<std::string, PathList> NameObjectListPair;
+        typedef std::vector<NameObjectListPair> ObjectMap;
+        ObjectMap objectMap;
+        
+        bool foundErrors = false;
+        for (Object& exam : m_objects) {
+            PathList* pathList = nullptr;
+            for (NameObjectListPair& pair : objectMap) {
+                
+                // Oh no!
+                if (pair.first == exam.m_name) {
+                    pathList = &pair.second;
+                    break;
+                }
+            }
+            
+            if (pathList) {
+                foundErrors = true;
+                pathList->push_back(exam.m_dbg_resdef);
+            } else {
+                NameObjectListPair nolp;
+                nolp.first = exam.m_name;
+                nolp.second.push_back(exam.m_dbg_resdef);
+                objectMap.push_back(nolp);
+            }
+        }
+        
+        if (foundErrors) {
+            std::stringstream sss;
+            for (NameObjectListPair& pair : objectMap) {
+                
+                if (pair.second.size() > 1) {
+                    sss << "Fatal! Detected naming conflict for resource \"" 
+                        << pair.first << "\"\n\tOffending declaration files:\n";
+                    for (boost::filesystem::path& file : pair.second) {
+                        sss << "\t" << file << "\n";
+                    }
+                }
+            }
+            throw std::runtime_error(sss.str());
+        }
+        else {
+            Logger::log()->info("No naming conflicts detected!");
+        }
+    }
+    
+    void determine_final_output_names() {
+        uint32_t seqName = 0;
+        for (Object& object : m_objects) {
+            
+            boost::filesystem::path outputObjectFile = m_conf.m_output_dir;
+            std::stringstream ss;
+            if (m_conf.m_obfuscate) {
+                ss << seqName;
+                ++seqName;
+            }
+            else {
+                ss << object.m_name;
+            }
+            outputObjectFile /= ss.str();
+
+            object.m_dest_file = outputObjectFile;
+        }
+    }
+    
+    void hash_file(const boost::filesystem::path& file, uint32_t& src_hash) {
+        std::ifstream sizeTest(file.string().c_str(), 
+                std::ios::binary | std::ios::ate);
+        int src_size = sizeTest.tellg();
+
+        char* totalData = new char[src_size];
+        sizeTest.seekg(0, std::ios::beg);
+        sizeTest.read(totalData, src_size);
+        sizeTest.close();
+
+        MurmurHash3_x86_32(totalData, src_size, 0xdaff0d11, &src_hash);
+
+        delete[] totalData;
+    }
+    
+    /**
+     * @brief Not a perfect hash (For some inputs, equal jsons does not imply 
+     * equal hashes and unequal hashes does not imply unequal jsons) However,
+     * for most cases this works good enough.
+     * @param val
+     * @param hash
+     */
+    void hash_json(const Json::Value& val, uint32_t& hash) {
+        std::string string_json = val.toStyledString();
+        MurmurHash3_x86_32(string_json.c_str(), string_json.size(), 0xdaff0d11,
+                &hash);
+    }
+    
+    std::string generate_interm_code(const Object& object) {
+        std::stringstream sss;
+        sss << object.m_name;
+        sss << "|||";
+        sss << object.m_type;
+        sss << "|||";
+        sss << object.m_src_hash;
+        sss << "|||";
+        sss << object.m_params_hash;
+        return sss.str();
+    }
+    
+    Json::Value m_json_interm;
+    boost::filesystem::path m_interm_file;
+    void use_previous_intermediates() {
+        if (boost::filesystem::exists(m_conf.m_interm_dir)) {
+            if (n_reset_interm) {
+                clean_directory(m_conf.m_interm_dir);
+            }
         } else {
-            std::cout << "Package file found successfully" << std::endl;
-        }
-        mDir = mFile.parent_path();
-        
-        mPackageJson = readJsonFile(mFile.string());
-        
-        // Configuration file location
-        boost::filesystem::path configFile = mDir / "compile.config";
-        
-        /* Default configuration:
-         *      no obfuscation
-         *      no ignored directories
-         *      output directory is named "__output__" and is a sub-directory of the project's root directory
-         *      previous output not overwritten
-         *      no intermediate directory / no intermediate data used
-         * 
-         */
-        bool obfuscate = false;
-        std::vector<boost::filesystem::path> ignoreDirs;
-        boost::filesystem::path outputDir = mDir / "__output__";
-        bool forceOverwriteOutput = false;
-        boost::filesystem::path intermediateDir;
-        bool useIntermediate = false;
-        
-        // Try read configuration
-        if(boost::filesystem::exists(configFile)) {
-            Json::Value configData = readJsonFile(configFile.string());
-            
-            outputDir = mDir / (configData["output"].asString());
-            obfuscate = configData["obfuscate"].asBool();
-            forceOverwriteOutput = configData["force-overwrite-output"].asBool();
-            outputVerbose = configData["output-verbose"].asBool();
-
-            if(!configData["intermediate"].isNull()) {
-                useIntermediate = true;
-                intermediateDir = mDir / (configData["intermediate"].asString());
-            }
-            
-            Json::Value& ignoreData = configData["ignore"];
-            
-            for(Json::Value::iterator iter = ignoreData.begin(); iter != ignoreData.end(); ++ iter) {
-                Json::Value& ignore = *iter;
-                
-                ignoreDirs.push_back(mDir / (ignore.asString()));
-            }
+            boost::filesystem::create_directories(m_conf.m_interm_dir);
         }
         
-        // Print configuration data
-        std::cout << "Configuration:" << std::endl;
-        std::cout << "\tOutput dir: " << outputDir << std::endl;
-        if(useIntermediate) {
-            std::cout << "\tIntermediate dir: " << intermediateDir << std::endl;
+        m_interm_file = m_conf.m_interm_dir / "intermediate.data";
+        if (!boost::filesystem::exists(m_interm_file)) {
+            m_json_interm["next-idx"] = 0;
         } else {
-            std::cout << "\tIntermediate data not used" << std::endl;
+            m_json_interm = readJsonFile(m_interm_file.string());
         }
-        std::cout << "\tObfuscation " << (obfuscate ? "enabled" : "disabled") << std::endl;
-        std::cout << std::endl;
+
+        Logger::log()->info("Checking for pre-compiled data...");
+
+        Json::Value& json_metadatas = m_json_interm["metadata"];
+        Json::Value& json_next_idx = m_json_interm["next-idx"];
+        uint64_t next_idx = json_next_idx.asUInt64();
+        for (Object& object : m_objects) {
+            hash_file(object.m_src_file, object.m_src_hash);
+            hash_json(object.m_params, object.m_params_hash);
+            
+            /*
+             * If a pre-compiled file exists with exactly the same:
+             *  Src file hash
+             *  Resource type
+             *  Compilation params hash
+             *  Compilation params
+             *
+             * Then simply copy the data into the output folder rather 
+             * than translate it again. (Therefore remove that object 
+             * from the list of objects to translate.)
+             */
+            
+            std::string interm_code = generate_interm_code(object);
+            Json::Value& json_metadata = json_metadatas[interm_code.c_str()];
+            
+            if (!object.m_force_retrans && !json_metadata.isNull()
+                    && equivalentJson(
+                            object.m_params, json_metadata["params"])) {
+                Logger::log()->verbose(2, "\tCopy: %v", object.m_name);
+                
+                object.m_skip_retrans = true;
+                object.m_interm_file = m_conf.m_interm_dir 
+                        / (json_metadata["file"].asString());
+                
+            } else {
+                if (object.m_force_retrans) {
+                    boost::filesystem::path old_interm = m_conf.m_interm_dir 
+                            / (json_metadata["file"].asString());
+                    boost::filesystem::remove(old_interm);
+                }
+                
+                std::stringstream sss;
+                sss << next_idx << ".r";
+                
+                object.m_interm_file = m_conf.m_interm_dir / sss.str();
+                
+                ++next_idx;
+            }
+        }
         
-        if(boost::filesystem::exists(outputDir)) {
-            if(forceOverwriteOutput) {
-                //boost::filesystem::remove_all(outputDir);
+        json_next_idx = next_idx;
+    }
+    
+    void process_all_resources() {
+        Logger::log()->info("Processing all resources...");
+
+        uint64_t totalSize = 0;
+        uint32_t num_skips = 0;
+        uint32_t num_converts = 0;
+        uint32_t num_fails = 0;
+
+        // Append the file provided by user
+        Json::Value json_output_pkg = m_package_json;
+        Json::Value& json_res_list = json_output_pkg["resources"];
+        uint32_t jsonListIndex = 0;
+
+        Json::Value& json_interm_metadatas = m_json_interm["metadata"];
+        for (Object& object : m_objects) {
+
+            if (object.m_skip_retrans) {
+                ++num_skips;
             }
             else {
-                std::cout << "Warning! Output directory " << outputDir << " already exists!" << std::endl;
-                bool decided = false;
-                bool decision;
-                while(!decided) {
-                    std::cout << "Overwrite? (y/n) ";
-                    std::string input;
-                    std::cin >> input;
-                    
-                    char a = *input.begin();
-                    if(a == 'y') {
-                        decided = true;
-                        decision = true;
-                    }
-                    else if(a == 'n') {
-                        decided = true;
-                        decision = false;
-                    }
+                Logger::log()->info("%v [%v]", object.m_name, object.m_type);
+                try {
+                    translateData(object, !m_conf.m_obfuscate);
                 }
-                
-                // Overwrite
-                if(decision) {
-                    //boost::filesystem::remove_all(outputDir);
-                }
-                
-                // Cancel
-                else {
-                    return false;
-                }
-            }
-
-            boost::filesystem::directory_iterator directoryEnd;
-            for(boost::filesystem::directory_iterator dirIter(outputDir); dirIter != directoryEnd; ++ dirIter) {
-                boost::filesystem::remove_all(*dirIter);
-            }
-        }
-        boost::filesystem::create_directories(outputDir);
-        
-        std::cout << "Searching for resources..." << std::endl;
-        std::vector<boost::filesystem::path> objectFiles;
-        recursiveSearch(mDir, ".resource", objectFiles, &ignoreDirs);
-        recursiveSearch(mDir, ".resources", objectFiles, &ignoreDirs);
-        std::cout << std::endl;
-        
-        std::cout << "Found " << objectFiles.size() << " resource declaration files." << std::endl;
-        std::cout << std::endl;
-        
-        for(std::vector<boost::filesystem::path>::iterator objectFileIter = objectFiles.begin(); objectFileIter != objectFiles.end(); ++ objectFileIter) {
-            boost::filesystem::path& objectFile = *objectFileIter;
-            Json::Value objectData = readJsonFile(objectFile.string());
-            
-            if(objectData.isArray()) {
-                for(Json::ValueIterator valueIter = objectData.begin(); valueIter != objectData.end(); ++ valueIter) {
-                    Json::Value& subData = *valueIter;
-                    
-                    if(subData.isObject()) {
-                        parseObject(subData, objectFile);
-                    }
-                    else {
-                        std::cout << "Warning! Resource declared in " << objectFile << " is not valid! (value = " << subData.toStyledString() << ")" << std::endl;
-                    }
-                }
-            }
-            else if(objectData.isObject()) {
-                parseObject(objectData, objectFile);
-            }
-            else {
-                std::cout << "Warning! Resource declared at " << objectFile << " is not valid! (value = " << objectData.toStyledString() << ")" << std::endl;
-            }
-        }
-        std::cout << std::endl;
-
-        // Detect naming conflicts
-        {
-            typedef std::vector<boost::filesystem::path> PathList;
-            typedef std::pair<std::string, PathList> NameObjectListPair;
-            typedef std::vector<NameObjectListPair> ObjectMap;
-            ObjectMap objectMap;
-            
-            bool foundErrors = false;
-            for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
-                Object& exam = *iter;
-                
-                PathList* pathList = 0;
-                for(ObjectMap::iterator look = objectMap.begin(); look != objectMap.end(); ++ look) {
-                    NameObjectListPair& pair = *look;
-                    
-                    // Oh no!
-                    if(pair.first == exam.mName) {
-                        pathList = &pair.second;
-                        break;
-                    }
-                }
-                
-                if(pathList) {
-                    foundErrors = true;
-                    pathList->push_back(exam.mDebugOrigin);
-                } else {
-                    NameObjectListPair nolp;
-                    nolp.first = exam.mName;
-                    nolp.second.push_back(exam.mDebugOrigin);
-                    objectMap.push_back(nolp);
-                }
-            }
-            
-            if(foundErrors) {
-                for(ObjectMap::iterator look = objectMap.begin(); look != objectMap.end(); ++ look) {
-                    NameObjectListPair& pair = *look;
-                    
-                    if(pair.second.size() > 1) {
-                        std::cout << "Fatal! Detected naming conflict for resource \"" << pair.first << "\"" << std::endl;
-                        std::cout << "\tOffending declaration files:" << std::endl;
-                        for(PathList::iterator egg = pair.second.begin(); egg != pair.second.end(); ++ egg) {
-                            std::cout << "\t" << (*egg) << std::endl;
-                        }
-                    }
-                }
-                std::cout << "Could not compile!" << std::endl;
-                std::cout << std::endl;
-                return false;
-            }
-            else {
-                std::cout << "No naming conflicts detected!" << std::endl;
-            }
-            
-        }
-        std::cout << std::endl;
-
-        // Determine the final output filename
-        {
-            uint32_t seqName = 0;
-            for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
-                Object& object = *iter;
-
-                boost::filesystem::path outputObjectFile = outputDir;
-                std::stringstream ss;
-                if(obfuscate) {
-                    ss << seqName;
-                }
-                else {
-                    ss << object.mName;
-                }
-                outputObjectFile /= ss.str();
-
-                object.mOutputFile = outputObjectFile;
-                
-                seqName ++;
-            }
-        }
-
-        if(useIntermediate) {
-            if(!boost::filesystem::exists(intermediateDir)) {
-                boost::filesystem::create_directories(intermediateDir);
-            }
-            
-            // Calcuate the hashes of input files
-            std::cout << "Calculating hashes..." << std::endl;
-            for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
-
-                Object& object = *iter;
-                
-                if(object.mAlwaysRetranslate) {
+                catch (std::runtime_error e) {
+                    ++num_fails;
+                    Logger::log()->warn("%v failed to translate: %v", 
+                            object.m_name, e.what());
                     continue;
                 }
-
-                std::ifstream sizeTest(object.mFile.string().c_str(), std::ios::binary | std::ios::ate);
-                object.mOriginalSize = sizeTest.tellg();
-
-                char* totalData = new char[object.mOriginalSize];
-                sizeTest.seekg(0, std::ios::beg);
-                sizeTest.read(totalData, object.mOriginalSize);
-                sizeTest.close();
-
-                MurmurHash3_x86_32(totalData, object.mOriginalSize, 1337, &(object.mOriginalHash));
-
-                delete[] totalData;
-
-                if(outputVerbose) {
-                    std::cout << "\t" << object.mOriginalHash << std::endl;
-                }
+                ++num_converts;
             }
-            std::cout << std::endl;
+            
+            std::string interm_code = generate_interm_code(object);
+            Json::Value& json_interm_metadata = 
+                    json_interm_metadatas[interm_code.c_str()];
+            json_interm_metadata["params"] = object.m_params;
+            json_interm_metadata["file"] = 
+                    object.m_interm_file.filename().string().c_str();
+            
+            
 
-            std::cout << "Checking for pre-compiled data..." << std::endl;
-
-            boost::filesystem::path intermediateFile = intermediateDir / "intermediate.data";
-
-            if(!boost::filesystem::exists(intermediateFile)) {
-                std::cout << "None exists!" << std::endl;
+            if (boost::filesystem::exists(object.m_dest_file)) {
+                boost::filesystem::remove(object.m_dest_file);
             }
-            else {
-                Json::Value previousCompilation = readJsonFile(intermediateFile.string());
+            boost::filesystem::copy(object.m_interm_file, 
+                    object.m_dest_file);
+            std::ifstream sizeTest(
+                    object.m_dest_file.string().c_str(), 
+                    std::ios::binary | std::ios::ate);
+            object.m_dest_size = sizeTest.tellg();
+            //
+            Json::Value& json_obj_def = json_res_list[jsonListIndex];
+            json_obj_def["name"] = object.m_name;
+            json_obj_def["type"] = object.m_type;
+            json_obj_def["file"] = object.m_dest_file.filename().string().c_str();
+            json_obj_def["size"] = object.m_dest_size;
 
-                const Json::Value& metadataList = previousCompilation["metadata"];
-                for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
+            totalSize += object.m_dest_size;
 
-                    /*
-                     * If a pre-compiled file exists with exactly the same:
-                     *  Input file hash
-                     *  Configuration:
-                     *      Type
-                     *      Parameters
-                     *
-                     * Then simply copy the data into the output folder rather than translate it again.
-                     *      (Therefore remove that object from the list of objects to translate.)
-                     */
-
-                    Object& object = *iter;
-                    
-                    if(object.mAlwaysRetranslate) {
-                        continue;
-                    }
-
-                    for(Json::Value::const_iterator meta = metadataList.begin(); meta != metadataList.end(); ++ meta) {
-                        const Json::Value& metadata = *meta;
-
-                        uint32_t checkHash = (uint32_t) (metadata["hash"].asInt64());
-                        ObjectType checkType = stringToType(metadata["type"].asString());
-                        const Json::Value& checkParams = metadata["params"];
-
-                        /*
-                        if(object.mType == ObjectType::WAVEFORM) {
-                            std::cout << "Hash match: " << (checkHash == object.mOriginalHash) << std::endl;
-                            std::cout << "Type match: " << (checkType == object.mType) << std::endl;
-                            std::cout << "Parameter match: " << (equivalentJson(checkParams, object.mParams)) << std::endl;
-                        }
-                        */
-                        
-                        if(checkHash == object.mOriginalHash && checkType == object.mType && equivalentJson(checkParams, object.mParams) && !isWorkInProgressType(object.mType)) {
-                            
-                            if(outputVerbose) {
-                                std::cout << "\tCopy: " << object.mName << std::endl;
-                            }
-                            object.mSkipTranslate = true;
-
-                            boost::filesystem::copy(intermediateDir / (metadata["file"].asString()), object.mOutputFile);
-                            std::ifstream sizeTest(object.mOutputFile.string().c_str(), std::ios::binary | std::ios::ate);
-                            object.mOutputSize = sizeTest.tellg();
-
-                            break;
-                        }
-                    }
-                }
-            }
-            std::cout << std::endl;
+            ++jsonListIndex;
         }
-        
-        std::cout << "Translating data..." << std::endl;
-        std::cout << std::endl;
-        {
-            boost::filesystem::path intermediateFile = intermediateDir / "intermediate.data";
-            Json::Value intermediateData;
-            uint32_t metadataIndex = 0;
-            if(useIntermediate) {
-                if(boost::filesystem::exists(intermediateFile)) {
-                    intermediateData = readJsonFile(intermediateFile.string());
-                    metadataIndex = intermediateData["metadata"].size();
-                }
-            }
+        Logger::log()->info("%v file(s) already built", num_skips);
+        Logger::log()->info("%v file(s) translated", num_converts);
+        Logger::log()->info("%v file(s) failed", num_fails);
 
-            uint64_t totalSize = 0;
-            uint32_t numUpdates = 0;
-            uint32_t numFails = 0;
+        Logger::log()->info("Exporting intermediate.data... ");
+        writeJsonFile(m_interm_file.string(), m_json_interm, true);
+        Logger::log()->info("Done!");
 
-            // Append the file provided by user
-            Json::Value outputPackageData = mPackageJson;
-            Json::Value& objectListData = outputPackageData["resources"];
-            uint32_t jsonListIndex = 0;
+        Logger::log()->info("Exporting data.package... ");
 
-            for(std::vector<Object>::iterator iter = objects.begin(); iter != objects.end(); ++ iter) {
-                Object& object = *iter;
+        Json::Value& metricsData = json_output_pkg["metrics"];
+        metricsData["size"] = (Json::UInt64) totalSize;
+        writeJsonFile((m_conf.m_output_dir / "data.package").string(), 
+                json_output_pkg, true);
+        Logger::log()->info("Done!");
+    }
 
-                if(outputVerbose) {
-                    std::cout << object.mName << " [" << typeToString(object.mType) << "]" << std::endl;
-                }
+public:
 
-                if(!object.mSkipTranslate || isWorkInProgressType(object.mType)) {
-                    std::cout << "\t->";
-                    
-                    // If verbose output is enabled, then the object name has already been printed
-                    if(!outputVerbose) {
-                        std::cout << " " << object.mName << " [" << typeToString(object.mType) << "]";
-                    }
-                    std::cout << "..." << std::endl;
-
-                    if(isWorkInProgressType(object.mType)) {
-                        std::cout << "\t(WIP)" << std::endl;
-                    }
-                    translateData(object.mType, object.mFile, object.mOutputFile, object.mOutputSize, object.mParams, !obfuscate);
-                    
-                    if(boost::filesystem::exists(object.mOutputFile)) {
-                        ++ numUpdates;
-                        if(useIntermediate) {
-                            Json::Value& objectMetadata = intermediateData["metadata"][metadataIndex];
-
-                            objectMetadata["hash"] = (Json::Int64) (object.mOriginalHash);
-                            objectMetadata["type"] = typeToString(object.mType);
-                            objectMetadata["params"] = object.mParams;
-
-                            std::stringstream ss;
-                            ss << object.mName;
-                            ss << typeToString(object.mType);
-                            ss << "-";
-                            ss << ((uint32_t) (object.mOriginalHash));
-                            ss << ".i";
-                            std::string intermFilename = ss.str();
-
-                            objectMetadata["file"] = intermFilename;
-
-                            // copy file
-                            boost::filesystem::path copyTo = intermediateDir / intermFilename;
-                            if(boost::filesystem::exists(copyTo)) {
-                                boost::filesystem::remove(copyTo);
-                            }
-                            boost::filesystem::copy(object.mOutputFile, copyTo);
-
-                            ++ metadataIndex;
-                        }
-                    }
-                    else {
-                        ++ numFails;
-                        std::cout << "ERROR: " << object.mName << " failed to translate!" << std::endl;
-                    }
-                }
-                //
-                Json::Value& objectDef = objectListData[jsonListIndex];
-                objectDef["name"] = object.mName;
-                objectDef["type"] = typeToString(object.mType);
-                objectDef["file"] = object.mOutputFile.filename().string().c_str();
-                objectDef["size"] = object.mOutputSize;
-
-                totalSize += object.mOutputSize;
-
-                ++ jsonListIndex;
-            }
-            std::cout << std::endl;
-            std::cout << numUpdates << " file(s) translated" << std::endl;
-            std::cout << numFails << " file(s) failed" << std::endl;
-            std::cout << std::endl;
-
-            if(useIntermediate) {
-                std::cout << "Exporting intermediate.data... ";
-                writeJsonFile(intermediateFile.string(), intermediateData, true);
-                std::cout << "Done!" << std::endl;
-                std::cout << std::endl;
-            }
-
-            std::cout << "Exporting data.package... ";
-
-            Json::Value& metricsData = outputPackageData["metrics"];
-            metricsData["size"] = (Json::UInt64) totalSize;
-            writeJsonFile((outputDir / "data.package").string(), outputPackageData);
-            std::cout << "Done!" << std::endl;
-            std::cout << std::endl;
+    bool preprocess() {
+        try {
+            load_package();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while loading package file: "
+                << e.what();
+            throw std::runtime_error(sss.str());
         }
-        
-        return true;
+        try {
+            load_config();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while loading config: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+    }
+
+    bool process() {
+        try {
+            prepare_output_dir();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while preparing output dir: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            parse_resource_declaration_files();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while parsing resource declaration files: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            expand_resources();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while expanding resources files: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            detect_naming_conflicts();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while detecting naming conflicts: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            determine_final_output_names();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while determining final output names: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            use_previous_intermediates();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while using intermediates: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
+        try {
+            process_all_resources();
+        } catch (std::runtime_error e) {
+            std::stringstream sss;
+            sss << "Error while processing resources: "
+                << e.what();
+            throw std::runtime_error(sss.str());
+        }
     }
 };
 
+const char* n_help_text = 
+"Options:\n"
+"   -c, --clean         Cleans the output folder\n"
+"   -r, --reset         Deletes cache (\"intermediate\" folder)\n"
+"   --obfus             Enables obfuscation of output filenames\n"
+"   --nobfus            Disables obfuscation of output filenames\n"
+"   -n <path>           Adds a path to the ignore list when searching\n"
+"   -d <path>           Sets the output path, may overwrite existing contents\n"
+"   -i <path>           Where to place cached files\n"
+"   -v, --verbose       Enables verbose logging"
+;
+
+} // namespace resman
+
+using namespace resman;
+
 int main(int argc, char* argv[]) {
-    if(argc <= 1) {
-        std::cout << "Error: must supply path to package definition file!" << std::endl;
-        std::cout << std::endl;
-        std::cout << "Usage: " << argv[0] << " <path to .package file>" <<std::endl;
-        std::cout << std::endl;
-        return 0;
+    Logger::initialize();
+    try {
+        if (argc < 2) {
+            std::string cmd = "resman";
+            if (argc > 0) {
+                cmd = argv[0];
+            }
+            Logger::log()->info("Usage: %v <package> [options]", cmd);
+            Logger::log()->info(n_help_text);
+            return 0;
+        }
+        
+        std::string package_file = argv[1];
+        
+        Project project(package_file);
+        project.preprocess();
+        
+        for (int i = 2; i < argc; ++i) {
+            if (std::strcmp(argv[i], "--clean") == 0
+                    || std::strcmp(argv[i], "-c") == 0) {
+                Logger::log()->info("Will clean output");
+                n_clean_output = true;
+                continue;
+            }
+            if (std::strcmp(argv[i], "--reset") == 0
+                    || std::strcmp(argv[i], "-r") == 0) {
+                Logger::log()->info("Will reset intermediate folder");
+                n_reset_interm = true;
+                continue;
+            }
+            if (std::strcmp(argv[i], "--obfus") == 0) {
+                project.m_conf.m_obfuscate = true;
+                continue;
+            }
+            if (std::strcmp(argv[i], "--nobfus") == 0) {
+                project.m_conf.m_obfuscate = false;
+                continue;
+            }
+            if (std::strcmp(argv[i], "-n") == 0) {
+                ++i;
+                if (i >= argc) continue;
+                std::string ignore_path = argv[i];
+                project.m_conf.m_ignores.emplace_back(ignore_path);
+                continue;
+            }
+            if (std::strcmp(argv[i], "-d") == 0) {
+                ++i;
+                if (i >= argc) continue;
+                std::string output_path = argv[i];
+                project.m_conf.m_output_dir = output_path;
+                continue;
+            }
+            if (std::strcmp(argv[i], "-i") == 0) {
+                ++i;
+                if (i >= argc) continue;
+                std::string interm_path = argv[i];
+                project.m_conf.m_interm_dir = interm_path;
+                continue;
+            }
+            if (std::strcmp(argv[i], "--verbose") == 0
+                    || std::strcmp(argv[i], "-v") == 0) {
+                n_verbose = true;
+                continue;
+            }
+        }
+        
+        project.process();
+    } catch (std::runtime_error e) {
+        Logger::log()->fatal(e.what());
     }
-    
-    Package package;
-    package.process(argv[1]);
+    Logger::cleanup();
     return 0;
 }

@@ -34,6 +34,8 @@ foreach(fname
 "main/ConvertImage.cpp"
 "main/ConvertMiscellaneous.cpp"
 "main/ConvertWaveform.cpp"
+"main/Convert_bgfx_Shader.cpp"
+"main/Expand_bgfx_Shader.cpp"
 "main/JsonUtil.cpp"
 "main/StreamWrite.cpp"
 

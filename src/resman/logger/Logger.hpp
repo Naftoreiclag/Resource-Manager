@@ -19,7 +19,7 @@
 
 #include <easylogging++.h>
 
-namespace pegr {
+namespace resman {
 namespace Logger {
 
 void initialize();
@@ -29,6 +29,6 @@ el::Logger* log();
 el::Logger* alog(const char* addon_name);
 
 } // namespace Logger
-} // namespace pegr
+} // namespace resman
 
 #endif // PEGR_LOGGER_LOGGER_HPP

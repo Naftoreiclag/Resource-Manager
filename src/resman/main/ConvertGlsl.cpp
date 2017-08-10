@@ -27,6 +27,8 @@
 
 #include "StreamWrite.hpp"
 
+namespace resman {
+
 /* Bytecode is compiled using SPIRV
  * 
  * TODO:
@@ -37,7 +39,12 @@
  *      SOUEMB (followed by one 32-bit unsigned integer describing the length of the assembly)
  * 
  */
-void convertGlsl(const boost::filesystem::path& inputFilename, const boost::filesystem::path& outputFilename, const Json::Value& params, bool modifyFilename) {
+void convertGlsl(const Convert_Args& args) {
+    // THIS FUNC IS DISABLED!!!
+    // VVVVVVVVVVVVVVVVVVVVVVV
+    convertMiscellaneous(args);
+    return;
+    
     bool paramBytecodeInclude = true;
     //paramBytecodeOptimizationLevel = 1;
     
@@ -46,40 +53,40 @@ void convertGlsl(const boost::filesystem::path& inputFilename, const boost::file
     
     {
         {
-            const Json::Value& jsonBytecodeParams = params["assemble"];
-            if(jsonBytecodeParams.isObject()) {
+            const Json::Value& jsonBytecodeParams = args.params["assemble"];
+            if (jsonBytecodeParams.isObject()) {
                 {
                     const Json::Value& jsonInclude = jsonBytecodeParams["include"];
-                    if(jsonInclude.isBool()) paramBytecodeInclude = jsonInclude.asBool();
+                    if (jsonInclude.isBool()) paramBytecodeInclude = jsonInclude.asBool();
                 }
             }
         }
         
         {
-            const Json::Value& jsonSourceParams = params["source"];
-            if(jsonSourceParams.isObject()) {
+            const Json::Value& jsonSourceParams = args.params["source"];
+            if (jsonSourceParams.isObject()) {
                 {
                     const Json::Value& jsonInclude = jsonSourceParams["include"];
-                    if(jsonInclude.isBool()) paramSourceInclude = jsonInclude.asBool();
+                    if (jsonInclude.isBool()) paramSourceInclude = jsonInclude.asBool();
                 }
                 {
                     const Json::Value& jsonStrip = jsonSourceParams["strip-comments"];
-                    if(jsonStrip.isBool()) paramSourceStripComments = jsonStrip.asBool();
+                    if (jsonStrip.isBool()) paramSourceStripComments = jsonStrip.asBool();
                 }
             }
         }
     }
     
-    if(!paramBytecodeInclude && !paramSourceInclude) {
+    if (!paramBytecodeInclude && !paramSourceInclude) {
         std::cout << "\tError! Neither bytecode nor source is being exported!" << std::endl;
         return;
     }
     
     std::stringstream ss;
     ss << "glslangValidator ";
-    ss << inputFilename.string();
+    ss << args.fromFile.string();
     ss << " -V -o ";
-    ss << outputFilename.string();
+    ss << args.outputFile.string();
     //std::cout << ss.str() << std::endl;
     std::system(ss.str().c_str());
     
@@ -96,9 +103,9 @@ void convertGlsl(const boost::filesystem::path& inputFilename, const boost::file
     std::ifstream inputFile(inputFilename.string().c_str(), std::ios::in | std::ios::binary);
     std::vector<char> inputData;
     char byte;
-    while(true) {
+    while (true) {
         inputFile.read(&byte, 1);
-        if(inputFile.eof()) {
+        if (inputFile.eof()) {
             break;
         }
         inputData.push_back(byte);
@@ -109,7 +116,7 @@ void convertGlsl(const boost::filesystem::path& inputFilename, const boost::file
     
     std::ofstream outputFile(outputFilename.string().c_str(), std::ios::out | std::ios::binary);
     
-    for(uint32_t i = 0; i < oBinary->wordCount; ++ i) {
+    for (uint32_t i = 0; i < oBinary->wordCount; ++ i) {
         writeU32(outputFile, oBinary->code[i]);
     }
     
@@ -121,3 +128,5 @@ void convertGlsl(const boost::filesystem::path& inputFilename, const boost::file
     // TODO: something with the params
     
 }
+
+} // namespace resman

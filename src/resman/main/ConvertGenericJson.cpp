@@ -18,7 +18,11 @@
 
 #include "JsonUtil.hpp"
 
-void convertGenericJson(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
-    Json::Value jsonFile = readJsonFile(fromFile.string());
-    writeJsonFile(outputFile.string(), jsonFile);
+namespace resman {
+
+void convertGenericJson(const Convert_Args& args) {
+    Json::Value jsonFile = readJsonFile(args.fromFile.string());
+    writeJsonFile(args.outputFile.string(), jsonFile);
 }
+
+} // namespace resman

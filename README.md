@@ -67,8 +67,8 @@ In the `tool/` directory are Python scripts that you may find useful:
 
 ### License
 
-Source code files in this repository for which I, James Fong, am the copyright 
-holder are distributed under the
+This project's source code files (located in this repository under the
+`src/resman/` directory) are distributed under the
 [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
 A copy of this license is available in the `LICENSE` file located in the
 root of this repository.

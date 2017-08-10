@@ -21,7 +21,12 @@
 
 #include <json/json.h>
 
+namespace resman {
+
 Json::Value readJsonFile(std::string filename);
 void writeJsonFile(std::string filename, Json::Value& value, bool compact = true);
+bool equivalentJson(const Json::Value& json1, const Json::Value& json2);
+
+} // namespace resman
 
 #endif // JSONUTIL_HPP

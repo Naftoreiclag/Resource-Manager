@@ -11,6 +11,8 @@
 
 #include "StreamWrite.hpp"
 
+namespace resman {
+
 struct FontDesc {
     float baseline;
     float padding;
@@ -26,7 +28,7 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
     int components;
     unsigned char* image = stbi_load(imgFile.string().c_str(), &width, &height, &components, 0);
 
-    if(!image) {
+    if (!image) {
         std::cout << "\tError: Failed to read metrics image file!" << std::endl;
         std::cout << "\t\t" << imgFile << std::endl;
         return;
@@ -35,46 +37,46 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
     uint32_t nRows = 16;
     uint32_t nColumns = 16;
 
-    if(width % nColumns != 0) {
+    if (width % nColumns != 0) {
         std::cout << "\tWarning: Metrics image width (" << width << ") not evenly divided by " << nColumns << std::endl;
     }
-    if(height % nRows != 0) {
+    if (height % nRows != 0) {
         std::cout << "\tWarning: Metrics image height (" << height << ") not evenly divided by " << nRows << std::endl;
     }
 
     uint32_t cellWidth = width / nColumns;
     uint32_t cellHeight = height / nRows;
 
-    if(cellWidth == 0 || cellHeight == 0) {
+    if (cellWidth == 0 || cellHeight == 0) {
         std::cout << "\tError: Invalid image area!" << std::endl;
         return;
     }
 
     uint32_t index = 0;
-    for(uint32_t cy = 0; cy < nRows; ++ cy) {
-        for(uint32_t cx = 0; cx < nColumns; ++ cx) {
+    for (uint32_t cy = 0; cy < nRows; ++ cy) {
+        for (uint32_t cx = 0; cx < nColumns; ++ cx) {
 
             bool foundBegin = false;
             uint32_t xBegin = 0;
-            for(uint32_t x = 0; x < cellWidth; ++ x) {
-                for(uint32_t y = 0; y < cellHeight; ++ y) {
+            for (uint32_t x = 0; x < cellWidth; ++ x) {
+                for (uint32_t y = 0; y < cellHeight; ++ y) {
                     uint32_t absX = (cx * cellWidth) + x;
                     uint32_t absY = (cy * cellHeight) + y;
                     uint32_t absIndex = (absX + (absY * width)) * components;
 
-                    if(image[absIndex] > 0) {
+                    if (image[absIndex] > 0) {
                         xBegin = x;
                         foundBegin = true;
                         break;
                     }
                 }
-                if(foundBegin) {
+                if (foundBegin) {
                     break;
                 }
             }
 
             // There is no beginning, then the width of this glyph is zero.
-            if(!foundBegin) {
+            if (!foundBegin) {
                 font.glyphWidth[index] = 0.f;
                 font.glyphStartX[index] = 0.f;
             }
@@ -83,24 +85,24 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
             else {
                 bool foundEnd = false;
                 uint32_t xEnd = 0;
-                for(uint32_t x = cellWidth - 1; x >= 0; -- x) {
-                    for(uint32_t y = 0; y < cellHeight; ++ y) {
+                for (uint32_t x = cellWidth - 1; x >= 0; -- x) {
+                    for (uint32_t y = 0; y < cellHeight; ++ y) {
                         uint32_t absX = (cx * cellWidth) + x;
                         uint32_t absY = (cy * cellHeight) + y;
                         uint32_t absIndex = (absX + (absY * width)) * components;
 
-                        if(image[absIndex] > 0) {
+                        if (image[absIndex] > 0) {
                             xEnd = x;
                             foundEnd = true;
                             break;
                         }
                     }
-                    if(foundEnd) {
+                    if (foundEnd) {
                         break;
                     }
                 }
 
-                if(!foundEnd) {
+                if (!foundEnd) {
                     // Should not be possible to get here
                 }
 
@@ -121,24 +123,24 @@ void generateMetrics(FontDesc& font, const boost::filesystem::path& imgFile) {
     }
 }
 
-void convertFont(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
+void convertFont(const Convert_Args& args) {
 
     Json::Value fontData;
     {
-        std::ifstream fileStream(fromFile.string().c_str());
+        std::ifstream fileStream(args.fromFile.string().c_str());
         fileStream >> fontData;
         fileStream.close();
     }
 
     const Json::Value& metricsData = fontData["metrics"];
 
-    if(metricsData.isNull()) {
+    if (metricsData.isNull()) {
         std::cout << "\tError: Font metrics specification absent!" << std::endl;
         return;
     }
 
     const Json::Value& renderingData = fontData["rendering"];
-    if(renderingData.isNull()) {
+    if (renderingData.isNull()) {
         std::cout << "\tError: Font rendering specification absent!" << std::endl;
     }
 
@@ -148,13 +150,13 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
     font.padding = metricsData["padding"].asFloat();
     font.texture = renderingData["texture"].asString();
 
-    generateMetrics(font, fromFile.parent_path() / (metricsData["imageFile"].asString()));
+    generateMetrics(font, args.fromFile.parent_path() / (metricsData["imageFile"].asString()));
 
     // Load special cases
     const Json::Value& manualData = metricsData["manual"];
-    if(!manualData.isNull())
+    if (!manualData.isNull())
     {
-        for(Json::Value::const_iterator it = manualData.begin(); it != manualData.end(); ++ it) {
+        for (Json::Value::const_iterator it = manualData.begin(); it != manualData.end(); ++ it) {
             const Json::Value& glyphData = *it;
 
             uint32_t gCode = glyphData["code"].asUInt();
@@ -166,12 +168,12 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
     }
 
     {
-        std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
+        std::ofstream outputData(args.outputFile.string().c_str(), std::ios::out | std::ios::binary);
 
         writeString(outputData, font.texture);
         writeF32(outputData, font.baseline);
         writeF32(outputData, font.padding);
-        for(uint32_t i = 0; i < 256; ++ i) {
+        for (uint32_t i = 0; i < 256; ++ i) {
             writeF32(outputData, font.glyphWidth[i]);
             writeF32(outputData, font.glyphStartX[i]);
         }
@@ -179,3 +181,5 @@ void convertFont(const boost::filesystem::path& fromFile, const boost::filesyste
         outputData.close();
     }
 }
+
+} // namespace resman

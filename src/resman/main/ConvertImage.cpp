@@ -27,14 +27,16 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-void convertImage(const boost::filesystem::path& fromFile, const boost::filesystem::path& outputFile, const Json::Value& params, bool modifyFilename) {
+namespace resman {
+
+void convertImage(const Convert_Args& args) {
 
     int width;
     int height;
     int components;
-    unsigned char* image = stbi_load(fromFile.string().c_str(), &width, &height, &components, 0);
+    unsigned char* image = stbi_load(args.fromFile.string().c_str(), &width, &height, &components, 0);
 
-    if(!image) {
+    if (!image) {
         std::cout << "\tFailed to read image!" << std::endl;
         return;
     }
@@ -42,27 +44,27 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
     bool writeAsDebug = false;
     bool manuallyFreeImage = false;
 
-    if(!params.isNull()) {
+    if (!args.params.isNull()) {
 
-        if(!params["debug"].isNull()) {
-            writeAsDebug = params["debug"].asBool();
+        if (!args.params["debug"].isNull()) {
+            writeAsDebug = args.params["debug"].asBool();
         }
         
-        const Json::Value& voronoiData = params["voronoi"];
-        if(!voronoiData.isNull()) {
+        const Json::Value& voronoiData = args.params["voronoi"];
+        if (!voronoiData.isNull()) {
             int nWidth = width;
             int nHeight = height;
 
             std::cout << "\tVoronoi" << std::endl;
-            if(!voronoiData["width"].isNull()) {
-                if(voronoiData["width"].asFloat() < 1) {
+            if (!voronoiData["width"].isNull()) {
+                if (voronoiData["width"].asFloat() < 1) {
                     nWidth = ((float) width) * voronoiData["width"].asFloat();
                 } else {
                     nWidth = voronoiData["width"].asInt();
                 }
             }
-            if(!voronoiData["height"].isNull()) {
-                if(voronoiData["height"].asFloat() < 1) {
+            if (!voronoiData["height"].isNull()) {
+                if (voronoiData["height"].asFloat() < 1) {
                     nHeight = ((float) height) * voronoiData["height"].asFloat();
                 } else {
                     nHeight = voronoiData["height"].asInt();
@@ -72,16 +74,16 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             // Which channel to detect the edge on
             // Example: 0 = red channel, 3 = alpha channel
             uint32_t channel = 0;
-            if(!voronoiData["channel"].isNull()) {
+            if (!voronoiData["channel"].isNull()) {
                 channel = voronoiData["channel"].asUInt();
 
-                if(channel >= components) {
+                if (channel >= components) {
                     std::cout << "\tWarning: Channel cannot be " << channel << std::endl;
                     channel = 0;
                 }
             }
 
-            if(nWidth < 1 || nHeight < 1) {
+            if (nWidth < 1 || nHeight < 1) {
                 std::cout << "\tFailed to calculate ssipg field: illegal dimensions" << std::endl;
             }
             else {
@@ -93,9 +95,9 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 uint32_t scaleY = height / nHeight;
 
                 // For each of the new pixels
-                for(int y = 0; y < nHeight; ++ y) {
-                    for(int x = 0; x < nWidth; ++ x) {
-                        if(image[(x * scaleX + (y * scaleY * width)) * components + channel] > 0) {
+                for (int y = 0; y < nHeight; ++ y) {
+                    for (int x = 0; x < nWidth; ++ x) {
+                        if (image[(x * scaleX + (y * scaleY * width)) * components + channel] > 0) {
                             voronoi[(x + (y * nHeight)) * 2 + 0] = x;
                             voronoi[(x + (y * nHeight)) * 2 + 1] = y;
                             continue;
@@ -107,13 +109,13 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
                         // The farthest distance (in original pixels) that should be scanned
                         uint32_t maxDist = x;
-                        if(maxDist < y) { maxDist = y; }
-                        if(maxDist < nWidth - x) { maxDist = nWidth - x; }
-                        if(maxDist < nHeight - y) { maxDist = nHeight - y; }
+                        if (maxDist < y) { maxDist = y; }
+                        if (maxDist < nWidth - x) { maxDist = nWidth - x; }
+                        if (maxDist < nHeight - y) { maxDist = nHeight - y; }
 
-                        for(uint32_t radius = 1; radius < maxDist; ++ radius) {
+                        for (uint32_t radius = 1; radius < maxDist; ++ radius) {
                             // Begin of spiral algorithm
-                            for(uint8_t direction = 0; direction < 4; ++ direction) {
+                            for (uint8_t direction = 0; direction < 4; ++ direction) {
                                 // 0  >  1
                                 //
                                 // ^     v
@@ -126,34 +128,34 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                 int32_t scanY = (direction == 0 || direction == 1) ? (y * scaleY - radius) : (y * scaleY + radius);
 
                                 // Stepping
-                                for(uint32_t step = 0; step <= radius * 2; ++ step) {
+                                for (uint32_t step = 0; step <= radius * 2; ++ step) {
 
                                     // Move the scanning coordinates based on direction
-                                    if(step > 0) {
-                                        if(direction == 0) {
+                                    if (step > 0) {
+                                        if (direction == 0) {
                                             ++ scanX;
-                                        } else if(direction == 1) {
+                                        } else if (direction == 1) {
                                             ++ scanY;
-                                        } else if(direction == 2) {
+                                        } else if (direction == 2) {
                                             -- scanX;
-                                        } else if(direction == 3) {
+                                        } else if (direction == 3) {
                                             -- scanY;
                                         }
                                     }
 
                                     // Do not check pixels that are outside the bounds
-                                    if(scanX < 0 || scanX >= width || scanY < 0 || scanY >= height) {
+                                    if (scanX < 0 || scanX >= width || scanY < 0 || scanY >= height) {
                                         continue;
                                     }
 
                                     // If this pixel is marked
-                                    if(image[(scanX + (scanY * width)) * components + channel] > 0) {
+                                    if (image[(scanX + (scanY * width)) * components + channel] > 0) {
                                         float distanceSq =
                                             (((x * scaleX) - scanX) * ((x * scaleX) - scanX)) +
                                             (((y * scaleY) - scanY) * ((y * scaleY) - scanY));
 
                                         // This is the first different pixel located
-                                        if(!pixelFound) {
+                                        if (!pixelFound) {
                                             // Then it is the closest so far
                                             shortestDistanceSq = distanceSq;
                                             voronoi[(x + (y * nHeight)) * 2 + 0] = scanX;
@@ -161,14 +163,14 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
                                             // Slight optimization: reduce maximum scanning distance
                                             float nMaxDist = std::ceil(std::sqrt(shortestDistanceSq));
-                                            if(nMaxDist < maxDist) { maxDist = nMaxDist; }
+                                            if (nMaxDist < maxDist) { maxDist = nMaxDist; }
 
                                             // Remember that the first pixel was already located
                                             pixelFound = true;
                                         }
 
                                         // This is yet another pixel located
-                                        else if(distanceSq < shortestDistanceSq) {
+                                        else if (distanceSq < shortestDistanceSq) {
                                             // Update shortest distance
                                             shortestDistanceSq = distanceSq;
                                             
@@ -177,7 +179,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
                                             // Slight optimization: reduce maximum scanning distance
                                             float nMaxDist = std::ceil(std::sqrt(shortestDistanceSq));
-                                            if(nMaxDist < maxDist) { maxDist = nMaxDist; }
+                                            if (nMaxDist < maxDist) { maxDist = nMaxDist; }
 
                                         }
                                     }
@@ -194,8 +196,8 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 unsigned char* nImage = new unsigned char[nWidth * nHeight * nComponents];
                 
                 // Convert to unsigned bytes
-                for(int y = 0; y < nHeight; ++ y) {
-                    for(int x = 0; x < nWidth; ++ x) {
+                for (int y = 0; y < nHeight; ++ y) {
+                    for (int x = 0; x < nWidth; ++ x) {
                         float vx = voronoi[(x + (y * nHeight)) * 2 + 0];
                         float vy = voronoi[(x + (y * nHeight)) * 2 + 1];
                         
@@ -203,7 +205,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         vy /= (float) nHeight;
 
                         // If for some reason nComponents > 1, this is necessary
-                        for(unsigned int juliet = 0; juliet < nComponents; ++ juliet) {
+                        for (unsigned int juliet = 0; juliet < nComponents; ++ juliet) {
                             nImage[((x + (y * nWidth)) * nComponents) + juliet] = 0.f;
                         }
                         
@@ -215,7 +217,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 delete[] voronoi;
 
                 // Swap out image
-                if(manuallyFreeImage) {
+                if (manuallyFreeImage) {
                     delete[] image;
                 } else {
                     stbi_image_free(image);
@@ -228,21 +230,21 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
         
-        const Json::Value& vectorFieldData = params["pixelDisplacementField"];
-        if(!vectorFieldData.isNull()) {
+        const Json::Value& vectorFieldData = args.params["pixelDisplacementField"];
+        if (!vectorFieldData.isNull()) {
             int nWidth = width;
             int nHeight = height;
 
             std::cout << "\tPixel displacement field" << std::endl;
-            if(!vectorFieldData["width"].isNull()) {
-                if(vectorFieldData["width"].asFloat() < 1) {
+            if (!vectorFieldData["width"].isNull()) {
+                if (vectorFieldData["width"].asFloat() < 1) {
                     nWidth = ((float) width) * vectorFieldData["width"].asFloat();
                 } else {
                     nWidth = vectorFieldData["width"].asInt();
                 }
             }
-            if(!vectorFieldData["height"].isNull()) {
-                if(vectorFieldData["height"].asFloat() < 1) {
+            if (!vectorFieldData["height"].isNull()) {
+                if (vectorFieldData["height"].asFloat() < 1) {
                     nHeight = ((float) height) * vectorFieldData["height"].asFloat();
                 } else {
                     nHeight = vectorFieldData["height"].asInt();
@@ -252,16 +254,16 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             // Which channel to detect the edge on
             // Example: 0 = red channel, 3 = alpha channel
             uint32_t channel = 0;
-            if(!vectorFieldData["channel"].isNull()) {
+            if (!vectorFieldData["channel"].isNull()) {
                 channel = vectorFieldData["channel"].asUInt();
 
-                if(channel >= components) {
+                if (channel >= components) {
                     std::cout << "\tWarning: Channel cannot be " << channel << std::endl;
                     channel = 0;
                 }
             }
 
-            if(nWidth < 1 || nHeight < 1) {
+            if (nWidth < 1 || nHeight < 1) {
                 std::cout << "\tFailed to calculate ssipg field: illegal dimensions" << std::endl;
             }
             else {
@@ -273,9 +275,9 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 uint32_t scaleY = height / nHeight;
 
                 // For each of the new pixels
-                for(int y = 0; y < nHeight; ++ y) {
-                    for(int x = 0; x < nWidth; ++ x) {
-                        if(image[(x * scaleX + (y * scaleY * width)) * components + channel] > 0) {
+                for (int y = 0; y < nHeight; ++ y) {
+                    for (int x = 0; x < nWidth; ++ x) {
+                        if (image[(x * scaleX + (y * scaleY * width)) * components + channel] > 0) {
                             voronoi[(x + (y * nHeight)) * 2 + 0] = 0;
                             voronoi[(x + (y * nHeight)) * 2 + 1] = 0;
                             continue;
@@ -287,13 +289,13 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
                         // The farthest distance (in original pixels) that should be scanned
                         uint32_t maxDist = x;
-                        if(maxDist < y) { maxDist = y; }
-                        if(maxDist < nWidth - x) { maxDist = nWidth - x; }
-                        if(maxDist < nHeight - y) { maxDist = nHeight - y; }
+                        if (maxDist < y) { maxDist = y; }
+                        if (maxDist < nWidth - x) { maxDist = nWidth - x; }
+                        if (maxDist < nHeight - y) { maxDist = nHeight - y; }
 
-                        for(uint32_t radius = 1; radius < maxDist; ++ radius) {
+                        for (uint32_t radius = 1; radius < maxDist; ++ radius) {
                             // Begin of spiral algorithm
-                            for(uint8_t direction = 0; direction < 4; ++ direction) {
+                            for (uint8_t direction = 0; direction < 4; ++ direction) {
                                 // 0  >  1
                                 //
                                 // ^     v
@@ -306,34 +308,34 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                 int32_t scanY = (direction == 0 || direction == 1) ? (y * scaleY - radius) : (y * scaleY + radius);
 
                                 // Stepping
-                                for(uint32_t step = 0; step <= radius * 2; ++ step) {
+                                for (uint32_t step = 0; step <= radius * 2; ++ step) {
 
                                     // Move the scanning coordinates based on direction
-                                    if(step > 0) {
-                                        if(direction == 0) {
+                                    if (step > 0) {
+                                        if (direction == 0) {
                                             ++ scanX;
-                                        } else if(direction == 1) {
+                                        } else if (direction == 1) {
                                             ++ scanY;
-                                        } else if(direction == 2) {
+                                        } else if (direction == 2) {
                                             -- scanX;
-                                        } else if(direction == 3) {
+                                        } else if (direction == 3) {
                                             -- scanY;
                                         }
                                     }
 
                                     // Do not check pixels that are outside the bounds
-                                    if(scanX < 0 || scanX >= width || scanY < 0 || scanY >= height) {
+                                    if (scanX < 0 || scanX >= width || scanY < 0 || scanY >= height) {
                                         continue;
                                     }
 
                                     // If this pixel is marked
-                                    if(image[(scanX + (scanY * width)) * components + channel] > 0) {
+                                    if (image[(scanX + (scanY * width)) * components + channel] > 0) {
                                         float distanceSq =
                                             (((x * scaleX) - scanX) * ((x * scaleX) - scanX)) +
                                             (((y * scaleY) - scanY) * ((y * scaleY) - scanY));
 
                                         // This is the first different pixel located
-                                        if(!pixelFound) {
+                                        if (!pixelFound) {
                                             // Then it is the closest so far
                                             shortestDistanceSq = distanceSq;
                                             voronoi[(x + (y * nHeight)) * 2 + 0] = scanX - x;
@@ -341,14 +343,14 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
                                             // Slight optimization: reduce maximum scanning distance
                                             float nMaxDist = std::ceil(std::sqrt(shortestDistanceSq));
-                                            if(nMaxDist < maxDist) { maxDist = nMaxDist; }
+                                            if (nMaxDist < maxDist) { maxDist = nMaxDist; }
 
                                             // Remember that the first pixel was already located
                                             pixelFound = true;
                                         }
 
                                         // This is yet another pixel located
-                                        else if(distanceSq < shortestDistanceSq) {
+                                        else if (distanceSq < shortestDistanceSq) {
                                             // Update shortest distance
                                             shortestDistanceSq = distanceSq;
                                             
@@ -357,7 +359,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
                                             // Slight optimization: reduce maximum scanning distance
                                             float nMaxDist = std::ceil(std::sqrt(shortestDistanceSq));
-                                            if(nMaxDist < maxDist) { maxDist = nMaxDist; }
+                                            if (nMaxDist < maxDist) { maxDist = nMaxDist; }
 
                                         }
                                     }
@@ -374,21 +376,21 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 unsigned char* nImage = new unsigned char[nWidth * nHeight * nComponents];
                 
                 // Convert to unsigned bytes
-                for(int y = 0; y < nHeight; ++ y) {
-                    for(int x = 0; x < nWidth; ++ x) {
+                for (int y = 0; y < nHeight; ++ y) {
+                    for (int x = 0; x < nWidth; ++ x) {
                         int32_t dx = voronoi[(x + (y * nHeight)) * 2 + 0];
                         int32_t dy = voronoi[(x + (y * nHeight)) * 2 + 1];
                         
                         dx += 127;
                         dy += 127;
                         
-                        if(dx < 0) { dx = 0; }
-                        if(dy < 0) { dy = 0; }
-                        if(dx >= 255) { dx = 255; }
-                        if(dy >= 255) { dy = 255; }
+                        if (dx < 0) { dx = 0; }
+                        if (dy < 0) { dy = 0; }
+                        if (dx >= 255) { dx = 255; }
+                        if (dy >= 255) { dy = 255; }
 
                         // If for some reason nComponents > 1, this is necessary
-                        for(unsigned int juliet = 0; juliet < nComponents; ++ juliet) {
+                        for (unsigned int juliet = 0; juliet < nComponents; ++ juliet) {
                             nImage[((x + (y * nWidth)) * nComponents) + juliet] = 0.f;
                         }
                         
@@ -400,7 +402,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 delete[] voronoi;
 
                 // Swap out image
-                if(manuallyFreeImage) {
+                if (manuallyFreeImage) {
                     delete[] image;
                 } else {
                     stbi_image_free(image);
@@ -413,22 +415,22 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
 
-        const Json::Value& distanceFieldData = params["distanceField"];
-        if(!distanceFieldData.isNull()) {
+        const Json::Value& distanceFieldData = args.params["distanceField"];
+        if (!distanceFieldData.isNull()) {
             int nWidth = width;
             int nHeight = height;
 
             std::cout << "\tDistance field" << std::endl;
 
-            if(!distanceFieldData["width"].isNull()) {
-                if(distanceFieldData["width"].asFloat() < 1) {
+            if (!distanceFieldData["width"].isNull()) {
+                if (distanceFieldData["width"].asFloat() < 1) {
                     nWidth = ((float) width) * distanceFieldData["width"].asFloat();
                 } else {
                     nWidth = distanceFieldData["width"].asInt();
                 }
             }
-            if(!distanceFieldData["height"].isNull()) {
-                if(distanceFieldData["height"].asFloat() < 1) {
+            if (!distanceFieldData["height"].isNull()) {
+                if (distanceFieldData["height"].asFloat() < 1) {
                     nHeight = ((float) height) * distanceFieldData["height"].asFloat();
                 } else {
                     nHeight = distanceFieldData["height"].asInt();
@@ -437,16 +439,16 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
             float insideSize = width;
             float outsideSize = height;
-            if(!distanceFieldData["inside"].isNull()) {
-                if(distanceFieldData["inside"].asFloat() < 1) {
+            if (!distanceFieldData["inside"].isNull()) {
+                if (distanceFieldData["inside"].asFloat() < 1) {
                     // Use width, why not?
                     insideSize = ((float) width) * distanceFieldData["inside"].asFloat();
                 } else {
                     insideSize = distanceFieldData["inside"].asInt();
                 }
             }
-            if(!distanceFieldData["outside"].isNull()) {
-                if(distanceFieldData["outside"].asFloat() < 1) {
+            if (!distanceFieldData["outside"].isNull()) {
+                if (distanceFieldData["outside"].asFloat() < 1) {
                     outsideSize = ((float) width) * distanceFieldData["outside"].asFloat();
                 } else {
                     outsideSize = distanceFieldData["outside"].asInt();
@@ -455,9 +457,9 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
             // This is the luminance of the pixels located on the edge of the original image
             float edgeValue = 0.5f;
-            if(!distanceFieldData["edgeValue"].isNull()) {
+            if (!distanceFieldData["edgeValue"].isNull()) {
                 float romeo = distanceFieldData["edgeValue"].asFloat();
-                if(romeo >= 0.f && romeo <= 1.f) {
+                if (romeo >= 0.f && romeo <= 1.f) {
                     edgeValue = romeo;
                 } else {
                     std::cout << "\tWarning: Edge value must be in the range (0.0, 1.0). Setting to default (0.5)." << std::endl;
@@ -467,16 +469,16 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             // Which channel to detect the edge on
             // Example: 0 = red channel, 3 = alpha channel
             uint32_t channel = 0;
-            if(!distanceFieldData["channel"].isNull()) {
+            if (!distanceFieldData["channel"].isNull()) {
                 channel = distanceFieldData["channel"].asUInt();
 
-                if(channel >= components) {
+                if (channel >= components) {
                     std::cout << "\tWarning: Channel cannot be " << channel << std::endl;
                     channel = 0;
                 }
             }
 
-            if(nWidth < 1 || nHeight < 1) {
+            if (nWidth < 1 || nHeight < 1) {
                 std::cout << "\tFailed to calculate distance field: illegal dimensions" << std::endl;
             }
             else {
@@ -498,8 +500,8 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 std::cout << "\tBeginning distance field calculation. This may take awhile..." << std::endl;
 
                 // For each of the new pixels
-                for(int y = 0; y < nHeight; ++ y) {
-                    for(int x = 0; x < nWidth; ++ x) {
+                for (int y = 0; y < nHeight; ++ y) {
+                    for (int x = 0; x < nWidth; ++ x) {
                         // Determine if this is inside or outside
                         bool isInside = image[(x * scaleX + (y * scaleY * width)) * components + channel] > 0;
 
@@ -510,9 +512,9 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         // The farthest distance (in original pixels) that should be scanned
                         uint32_t maxDist = std::ceil(isInside ? insideSize : outsideSize);
 
-                        for(uint32_t radius = 1; radius < maxDist; ++ radius) {
+                        for (uint32_t radius = 1; radius < maxDist; ++ radius) {
                             // Begin of spiral algorithm
-                            for(uint8_t direction = 0; direction < 4; ++ direction) {
+                            for (uint8_t direction = 0; direction < 4; ++ direction) {
                                 // 0  >  1
                                 //
                                 // ^     v
@@ -525,23 +527,23 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                 int32_t scanY = (direction == 0 || direction == 1) ? (y * scaleY - radius) : (y * scaleY + radius);
 
                                 // Stepping
-                                for(uint32_t step = 0; step <= radius * 2; ++ step) {
+                                for (uint32_t step = 0; step <= radius * 2; ++ step) {
 
                                     // Move the scanning coordinates based on direction
-                                    if(step > 0) {
-                                        if(direction == 0) {
+                                    if (step > 0) {
+                                        if (direction == 0) {
                                             ++ scanX;
-                                        } else if(direction == 1) {
+                                        } else if (direction == 1) {
                                             ++ scanY;
-                                        } else if(direction == 2) {
+                                        } else if (direction == 2) {
                                             -- scanX;
-                                        } else if(direction == 3) {
+                                        } else if (direction == 3) {
                                             -- scanY;
                                         }
                                     }
 
                                     // Do not check pixels that are outside the bounds
-                                    if(scanX < 0 || scanX >= width || scanY < 0 || scanY >= height) {
+                                    if (scanX < 0 || scanX >= width || scanY < 0 || scanY >= height) {
                                         continue;
                                     }
 
@@ -549,32 +551,32 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                     ++ numPixelsChecked;
 
                                     // If this pixel is of a different side
-                                    if((image[(scanX + (scanY * width)) * components + channel] > 0) ^ isInside) {
+                                    if ((image[(scanX + (scanY * width)) * components + channel] > 0) ^ isInside) {
                                         float distanceSq =
                                             (((x * scaleX) - scanX) * ((x * scaleX) - scanX)) +
                                             (((y * scaleY) - scanY) * ((y * scaleY) - scanY));
 
                                         // This is the first different pixel located
-                                        if(!pixelFound) {
+                                        if (!pixelFound) {
                                             // Then it is the closest so far
                                             shortestDistanceSq = distanceSq;
 
                                             // Slight optimization: reduce maximum scanning distance
                                             float nMaxDist = std::ceil(std::sqrt(shortestDistanceSq));
-                                            if(nMaxDist < maxDist) { maxDist = nMaxDist; }
+                                            if (nMaxDist < maxDist) { maxDist = nMaxDist; }
 
                                             // Remember that the first pixel was already located
                                             pixelFound = true;
                                         }
 
                                         // This is yet another pixel located
-                                        else if(distanceSq < shortestDistanceSq) {
+                                        else if (distanceSq < shortestDistanceSq) {
                                             // Update shortest distance
                                             shortestDistanceSq = distanceSq;
 
                                             // Slight optimization: reduce maximum scanning distance
                                             float nMaxDist = std::ceil(std::sqrt(shortestDistanceSq));
-                                            if(nMaxDist < maxDist) { maxDist = nMaxDist; }
+                                            if (nMaxDist < maxDist) { maxDist = nMaxDist; }
 
                                         }
                                     }
@@ -584,16 +586,16 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
                         /*
                         // use spiraling instead. THIS IS WAY TOO SLOW!!!
-                        for(int oy = 0; oy < height; ++ oy) {
-                            for(int ox = 0; ox < width; ++ ox) {
+                        for (int oy = 0; oy < height; ++ oy) {
+                            for (int ox = 0; ox < width; ++ ox) {
                                 // If this pixel is of a different side
-                                if((image[(ox + (oy * width)) * components + channel] > 0) ^ isInside) {
+                                if ((image[(ox + (oy * width)) * components + channel] > 0) ^ isInside) {
                                     float distanceSq = (((x * scaleX) - ox) * ((x * scaleX) - ox)) + (((y * scaleY) - oy) * ((y * scaleY) - oy));
-                                    if(!pixelFound) {
+                                    if (!pixelFound) {
                                         shortestDistanceSq = distanceSq;
                                         pixelFound = true;
                                     }
-                                    else if(shortestDistanceSq > distanceSq) {
+                                    else if (shortestDistanceSq > distanceSq) {
                                         shortestDistanceSq = distanceSq;
                                     }
                                 }
@@ -605,12 +607,12 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         // 0 = deep within negative area
                         float intensity;
 
-                        if(pixelFound) {
+                        if (pixelFound) {
                             float shortestDistance = std::sqrt(shortestDistanceSq);
 
-                            if(isInside) {
+                            if (isInside) {
                                 shortestDistance /= insideSize;
-                                if(shortestDistance > 1.0f) {
+                                if (shortestDistance > 1.0f) {
                                     intensity = 1.f;
                                 }
                                 else {
@@ -618,7 +620,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                 }
                             } else {
                                 shortestDistance /= outsideSize;
-                                if(shortestDistance > 1.0f) {
+                                if (shortestDistance > 1.0f) {
                                     intensity = 0.f;
                                 }
                                 else {
@@ -634,7 +636,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         }
 
                         // If for some reason nComponents > 1, this is necessary
-                        for(unsigned int juliet = 0; juliet < nComponents; ++ juliet) {
+                        for (unsigned int juliet = 0; juliet < nComponents; ++ juliet) {
                             nImage[((x + (y * nWidth)) * nComponents) + juliet] = 255.f * intensity;
                         }
                     }
@@ -655,7 +657,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 }
 
                 // Swap out image
-                if(manuallyFreeImage) {
+                if (manuallyFreeImage) {
                     delete[] image;
                 } else {
                     stbi_image_free(image);
@@ -668,27 +670,27 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
 
-        const Json::Value& resizeData = params["resize"];
-        if(!resizeData.isNull()) {
+        const Json::Value& resizeData = args.params["resize"];
+        if (!resizeData.isNull()) {
             int nWidth = width;
             int nHeight = height;
 
-            if(!resizeData["width"].isNull()) {
-                if(resizeData["width"].asFloat() < 1) {
+            if (!resizeData["width"].isNull()) {
+                if (resizeData["width"].asFloat() < 1) {
                     nWidth = ((float) width) * resizeData["width"].asFloat();
                 } else {
                     nWidth = resizeData["width"].asInt();
                 }
             }
-            if(!resizeData["height"].isNull()) {
-                if(resizeData["height"].asFloat() < 1) {
+            if (!resizeData["height"].isNull()) {
+                if (resizeData["height"].asFloat() < 1) {
                     nHeight = ((float) height) * resizeData["height"].asFloat();
                 } else {
                     nHeight = resizeData["height"].asInt();
                 }
             }
 
-            if(nWidth < 1 || nHeight < 1) {
+            if (nWidth < 1 || nHeight < 1) {
                 std::cout << "\tFailed to resize image: illegal dimensions" << std::endl;
             }
             else {
@@ -699,7 +701,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 unsigned char* tempImageData = new unsigned char[size];
 
                 stbir_resize_uint8(image, width, height, 0, tempImageData, nWidth, nHeight, 0, components);
-                if(manuallyFreeImage) {
+                if (manuallyFreeImage) {
                     delete[] image;
                 } else {
                     stbi_image_free(image);
@@ -709,7 +711,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                 height = nHeight;
                 image = new unsigned char[size];
                 // Copy because
-                for(int i = 0; i < size; ++ i) {
+                for (int i = 0; i < size; ++ i) {
                     image[i] = tempImageData[i];
                 }
                 
@@ -717,23 +719,23 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
 
-        const Json::Value& limitComponentsData = params["limitComponents"];
-        if(!limitComponentsData.isNull()) {
+        const Json::Value& limitComponentsData = args.params["limitComponents"];
+        if (!limitComponentsData.isNull()) {
             uint32_t nComponents = limitComponentsData.asInt();
             
-            if(nComponents < components && nComponents > 0) {
+            if (nComponents < components && nComponents > 0) {
                 
                 unsigned char* nImage = new unsigned char[width * height * nComponents];
                 
-                for(uint32_t y = 0; y < height; ++ y) {
-                    for(uint32_t x = 0; x < width; ++ x) {
-                        for(uint32_t c = 0; c < nComponents; ++ c) {
+                for (uint32_t y = 0; y < height; ++ y) {
+                    for (uint32_t x = 0; x < width; ++ x) {
+                        for (uint32_t c = 0; c < nComponents; ++ c) {
                             nImage[((y * width) + x) * nComponents + c] = image[((y * width) + x) * components + c];
                         }
                     }
                 }
                 
-                if(manuallyFreeImage) {
+                if (manuallyFreeImage) {
                     delete[] image;
                 } else {
                     stbi_image_free(image);
@@ -744,19 +746,19 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
         
-        const Json::Value& extendComponentsData = params["extendComponents"];
-        if(!extendComponentsData.isNull()) {
+        const Json::Value& extendComponentsData = args.params["extendComponents"];
+        if (!extendComponentsData.isNull()) {
             uint32_t nComponents = extendComponentsData.asInt();
             std::cout << "\tExtending components: " << nComponents << std::endl;
             
-            if(nComponents > components) {
+            if (nComponents > components) {
                 
                 unsigned char* nImage = new unsigned char[width * height * nComponents];
                 
-                for(uint32_t y = 0; y < height; ++ y) {
-                    for(uint32_t x = 0; x < width; ++ x) {
-                        for(uint32_t c = 0; c < nComponents; ++ c) {
-                            if(c > components) {
+                for (uint32_t y = 0; y < height; ++ y) {
+                    for (uint32_t x = 0; x < width; ++ x) {
+                        for (uint32_t c = 0; c < nComponents; ++ c) {
+                            if (c > components) {
                                 nImage[((y * width) + x) * nComponents + c] = 1;
                             } else {
                                 nImage[((y * width) + x) * nComponents + c] = image[((y * width) + x) * components + c];
@@ -765,7 +767,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     }
                 }
                 
-                if(manuallyFreeImage) {
+                if (manuallyFreeImage) {
                     delete[] image;
                 } else {
                     stbi_image_free(image);
@@ -776,17 +778,17 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
             }
         }
 
-        if(components > 3) {
-            if(!params["alphaCleave"].isNull()) {
-                std::string alphaCleave = params["alphaCleave"].asString();
+        if (components > 3) {
+            if (!args.params["alphaCleave"].isNull()) {
+                std::string alphaCleave = args.params["alphaCleave"].asString();
 
-                if(alphaCleave == "premultiply") {
+                if (alphaCleave == "premultiply") {
                     std::cout << "\tAlpha cleave: premultiply" << std::endl;
                     int size = width * height * 3;
                     unsigned char* nImage = new unsigned char[size];
 
-                    for(int y = 0; y < height; ++ y) {
-                        for(int x = 0; x < width; ++ x) {
+                    for (int y = 0; y < height; ++ y) {
+                        for (int x = 0; x < width; ++ x) {
                             unsigned char rn = image[(x + (y * width)) * components + 0];
                             unsigned char gn = image[(x + (y * width)) * components + 1];
                             unsigned char bn = image[(x + (y * width)) * components + 2];
@@ -809,7 +811,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         }
                     }
 
-                    if(manuallyFreeImage) {
+                    if (manuallyFreeImage) {
                         delete[] image;
                     } else {
                         stbi_image_free(image);
@@ -818,20 +820,20 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     image = nImage;
                     components = 3;
                 }
-                else if(alphaCleave == "lazy") {
+                else if (alphaCleave == "lazy") {
                     std::cout << "\tAlpha cleave: lazy" << std::endl;
                     int size = width * height * 3;
                     unsigned char* nImage = new unsigned char[size];
 
-                    for(int y = 0; y < height; ++ y) {
-                        for(int x = 0; x < width; ++ x) {
+                    for (int y = 0; y < height; ++ y) {
+                        for (int x = 0; x < width; ++ x) {
                             nImage[(x + (y * width)) * 3 + 0] = image[(x + (y * width)) * components + 0];
                             nImage[(x + (y * width)) * 3 + 1] = image[(x + (y * width)) * components + 1];
                             nImage[(x + (y * width)) * 3 + 2] = image[(x + (y * width)) * components + 2];
                         }
                     }
 
-                    if(manuallyFreeImage) {
+                    if (manuallyFreeImage) {
                         delete[] image;
                     } else {
                         stbi_image_free(image);
@@ -840,14 +842,14 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     image = nImage;
                     components = 3;
                 }
-                else if(alphaCleave == "clamp") {
+                else if (alphaCleave == "clamp") {
                     std::cout << "\tAlpha cleave: clamp" << std::endl;
                     int size = width * height * 3;
                     unsigned char* nImage = new unsigned char[size];
 
-                    for(int y = 0; y < height; ++ y) {
-                        for(int x = 0; x < width; ++ x) {
-                            if(image[(x + (y * width)) * components + 3] > 0) {
+                    for (int y = 0; y < height; ++ y) {
+                        for (int x = 0; x < width; ++ x) {
+                            if (image[(x + (y * width)) * components + 3] > 0) {
                                 nImage[(x + (y * width)) * 3 + 0] = image[(x + (y * width)) * components + 0];
                                 nImage[(x + (y * width)) * 3 + 1] = image[(x + (y * width)) * components + 1];
                                 nImage[(x + (y * width)) * 3 + 2] = image[(x + (y * width)) * components + 2];
@@ -859,7 +861,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         }
                     }
 
-                    if(manuallyFreeImage) {
+                    if (manuallyFreeImage) {
                         delete[] image;
                     } else {
                         stbi_image_free(image);
@@ -868,20 +870,20 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     image = nImage;
                     components = 3;
                 }
-                else if(alphaCleave == "mask") {
+                else if (alphaCleave == "mask") {
                     std::cout << "\tAlpha cleave: mask" << std::endl;
                     int size = width * height * 3;
                     unsigned char* nImage = new unsigned char[size];
 
-                    for(int y = 0; y < height; ++ y) {
-                        for(int x = 0; x < width; ++ x) {
+                    for (int y = 0; y < height; ++ y) {
+                        for (int x = 0; x < width; ++ x) {
                             nImage[(x + (y * width)) * 3 + 0] = image[(x + (y * width)) * components + 3];
                             nImage[(x + (y * width)) * 3 + 1] = image[(x + (y * width)) * components + 3];
                             nImage[(x + (y * width)) * 3 + 2] = image[(x + (y * width)) * components + 3];
                         }
                     }
 
-                    if(manuallyFreeImage) {
+                    if (manuallyFreeImage) {
                         delete[] image;
                     } else {
                         stbi_image_free(image);
@@ -890,7 +892,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     image = nImage;
                     components = 3;
                 }
-                else if(alphaCleave == "shell" || alphaCleave == "shellhq") {
+                else if (alphaCleave == "shell" || alphaCleave == "shellhq") {
                     bool highQuality = (alphaCleave == "shellhq");
                     std::cout << "\tAlpha cleave: shell" << (highQuality ? "hq" : "") << std::endl;
                     int size = width * height * 3;
@@ -901,8 +903,8 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                     double total = width * height;
                     int percentDone = 0;
                     double progress = 0;
-                    for(int y = 0; y < height; ++ y) {
-                        for(int x = 0; x < width; ++ x) {
+                    for (int y = 0; y < height; ++ y) {
+                        for (int x = 0; x < width; ++ x) {
 
                             unsigned char& finalR = nImage[(x + (y * width)) * 3 + 0];
                             unsigned char& finalG = nImage[(x + (y * width)) * 3 + 1];
@@ -911,7 +913,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                             finalG = 0;
                             finalB = 255;
 
-                            if(image[(x + (y * width)) * components + 3] > opp) {
+                            if (image[(x + (y * width)) * components + 3] > opp) {
                                 finalR = image[(x + (y * width)) * components + 0];
                                 finalG = image[(x + (y * width)) * components + 1];
                                 finalB = image[(x + (y * width)) * components + 2];
@@ -928,16 +930,16 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                 // Slightly more efficient
 
                                 int end = height > width ? height : width;
-                                if((end & 1) == 1) {
+                                if ((end & 1) == 1) {
                                     ++ end;
                                 }
                                 end /= 2;
 
-                                for(int expand = 1; expand < end; ++ expand) {
+                                for (int expand = 1; expand < end; ++ expand) {
 
 
                                     // Begin of spiral algorithm
-                                    for(int index = 0; index < 4; ++ index) {
+                                    for (int index = 0; index < 4; ++ index) {
                                         // 0  >  1
                                         //
                                         // ^     v
@@ -947,35 +949,35 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                         int scanX = (index == 0 || index == 3) ? (x - expand) : (x + expand);
                                         int scanY = (index == 0 || index == 1) ? (y - expand) : (y + expand);
 
-                                        for(int step = 0; step <= expand * 2; ++ step) {
-                                            if(step > 0) {
-                                                if(index == 0) {
+                                        for (int step = 0; step <= expand * 2; ++ step) {
+                                            if (step > 0) {
+                                                if (index == 0) {
                                                     ++ scanX;
-                                                } else if(index == 1) {
+                                                } else if (index == 1) {
                                                     ++ scanY;
-                                                } else if(index == 2) {
+                                                } else if (index == 2) {
                                                     -- scanX;
-                                                } else if(index == 3) {
+                                                } else if (index == 3) {
                                                     -- scanY;
                                                 }
                                             }
 
-                                            if(scanX < 0 || scanX >= width || scanY < 0 || scanY >= height) {
+                                            if (scanX < 0 || scanX >= width || scanY < 0 || scanY >= height) {
                                                 continue;
                                             }
 
                                             unsigned char alphaTest = image[(scanX + (scanY * width)) * components + 3];
 
-                                            if(alphaTest > opp) {
+                                            if (alphaTest > opp) {
                                                 double dist = ((x - scanX) * (x - scanX)) + ((y - scanY) * (y - scanY));
-                                                if(first) {
+                                                if (first) {
                                                     first = false;
                                                     closest = dist;
                                                     closestX = scanX;
                                                     closestY = scanY;
                                                 }
                                                 else {
-                                                    if(dist < closest) {
+                                                    if (dist < closest) {
                                                         closest = dist;
                                                         closestX = scanX;
                                                         closestY = scanY;
@@ -986,16 +988,16 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                     }
 
                                     // If a opaque pixel was found in that search
-                                    if(!first && !recalc) {
+                                    if (!first && !recalc) {
                                         double newEnd = ((double) expand) * 1.5;
                                         end = (newEnd < end) ? (newEnd) : end;
                                         recalc = true;
                                     }
                                 }
 
-                                if(highQuality) {
+                                if (highQuality) {
                                     int sampleRad = (width > height ? width : height) / 20;
-                                    if(sampleRad < 1) {
+                                    if (sampleRad < 1) {
                                         sampleRad = 1;
                                     }
 
@@ -1004,17 +1006,17 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                                     double avgB = 0;
                                     int numSamples = 0;
 
-                                    for(int dx = -sampleRad; dx <= sampleRad; ++ dx) {
-                                        for(int dy = -sampleRad; dy <= sampleRad; ++ dy) {
+                                    for (int dx = -sampleRad; dx <= sampleRad; ++ dx) {
+                                        for (int dy = -sampleRad; dy <= sampleRad; ++ dy) {
 
                                             int sampleX = closestX + dx;
                                             int sampleY = closestY + dy;
 
-                                            if(sampleX < 0 || sampleX >= width || sampleY < 0 || sampleY >= height) {
+                                            if (sampleX < 0 || sampleX >= width || sampleY < 0 || sampleY >= height) {
                                                 continue;
                                             }
 
-                                            if(image[(sampleX + (sampleY * width)) * components + 3] > opp) {
+                                            if (image[(sampleX + (sampleY * width)) * components + 3] > opp) {
                                                 avgR += image[(sampleX + (sampleY * width)) * components + 0];
                                                 avgG += image[(sampleX + (sampleY * width)) * components + 1];
                                                 avgB += image[(sampleX + (sampleY * width)) * components + 2];
@@ -1041,7 +1043,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
                             progress += 1;
 
-                            if(progress >= (total / 10.0)) {
+                            if (progress >= (total / 10.0)) {
                                 percentDone += 10;
                                 progress = 0;
                                 std::cout << "\t" << percentDone << "%" << std::endl;
@@ -1049,7 +1051,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
                         }
                     }
 
-                    if(manuallyFreeImage) {
+                    if (manuallyFreeImage) {
                         delete[] image;
                     } else {
                         stbi_image_free(image);
@@ -1067,11 +1069,11 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
     std::cout << "\tComponents: " << components << std::endl;
     std::cout << "\tRaw array size: " << (width * height * components) << std::endl;
 
-    //if(writeAsDebug) {
-    if(true) {
-        int result = stbi_write_png(outputFile.string().c_str(), width, height, components, image, 0);
+    //if (writeAsDebug) {
+    if (true) {
+        int result = stbi_write_png(args.outputFile.string().c_str(), width, height, components, image, 0);
 
-        if(result > 0) {
+        if (result > 0) {
             return;
         }
         else {
@@ -1079,15 +1081,15 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
         }
     }
 
-    std::ofstream outputData(outputFile.string().c_str(), std::ios::out | std::ios::binary);
+    std::ofstream outputData(args.outputFile.string().c_str(), std::ios::out | std::ios::binary);
 
     outputData << width;
     outputData << height;
     outputData << components;
 
-    for(int y = 0; y < height; ++ y) {
-        for(int x = 0; x < width; ++ x) {
-            for(int n = 0; n < components; ++ n) {
+    for (int y = 0; y < height; ++ y) {
+        for (int x = 0; x < width; ++ x) {
+            for (int n = 0; n < components; ++ n) {
                 outputData << image[n + ((x + (y * width)) * components)];
             }
         }
@@ -1095,7 +1097,7 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
     outputData.close();
 
-    if(manuallyFreeImage) {
+    if (manuallyFreeImage) {
         delete[] image;
     }
     else {
@@ -1104,3 +1106,5 @@ void convertImage(const boost::filesystem::path& fromFile, const boost::filesyst
 
     return;
 }
+
+} // namespace resman
