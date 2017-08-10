@@ -34,6 +34,16 @@
 
 namespace resman {
 
+int32_t n_fversion_major = 0;
+int32_t n_fversion_minor = 2;
+int32_t n_fversion_patch = 0;
+    
+void write_format_version(Json::Value& where) {
+    where["major"] = n_fversion_major;
+    where["minor"] = n_fversion_minor;
+    where["patch"] = n_fversion_patch;
+}
+
 // Useful for debug information, but significantly slows down packaging
 bool n_verbose = true;
 bool n_reset_interm = false;
@@ -588,6 +598,7 @@ private:
 
         // Append the file provided by user
         Json::Value json_output_pkg;
+        write_format_version(json_output_pkg["fversion"]);
         json_output_pkg["info"] = m_package_json;
         Json::Value& json_res_list = json_output_pkg["resources"];
         uint32_t jsonListIndex = 0;
