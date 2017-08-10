@@ -78,7 +78,7 @@ endif()
 
 # Boost #
 message(STATUS "Boost Filesystem =====")
-find_package(Boost 1.45.0 COMPONENTS system filesystem)
+find_package(Boost 1.46.0 COMPONENTS system filesystem)
 if(Boost_FOUND)
     message(STATUS "\tInclude Dirs: " ${Boost_INCLUDE_DIRS})
     message(STATUS "\tLibraries: " ${Boost_LIBRARIES})
