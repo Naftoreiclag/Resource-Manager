@@ -587,7 +587,8 @@ private:
         uint32_t num_fails = 0;
 
         // Append the file provided by user
-        Json::Value json_output_pkg = m_package_json;
+        Json::Value json_output_pkg;
+        json_output_pkg["info"] = m_package_json;
         Json::Value& json_res_list = json_output_pkg["resources"];
         uint32_t jsonListIndex = 0;
 
