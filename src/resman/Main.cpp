@@ -81,7 +81,7 @@ std::map<OType, Convert_Func> n_converters = {
 };
 
 std::map<OType, Expand_Func> n_expanders = {
-    {"bgfx-shader", expand_bgfx_shader}
+    {"shader", expand_bgfx_shader}
 };
 
 /**

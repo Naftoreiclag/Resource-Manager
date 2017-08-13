@@ -1,5 +1,6 @@
 #include "Convert.hpp"
 
+#include <cassert>
 #include <stdexcept>
 #include <vector>
 #include <sstream>
@@ -8,32 +9,81 @@
 
 namespace resman {
 
+template<typename T>
 struct Alias_bgfx {
     std::vector<std::string> m_from;
-    std::string m_to;
+    T m_to;
 };
     
-const std::vector<Alias_bgfx> n_type_aliases = {
-    {{"v", "vert", "vertex"}, "v"},
-    {{"f", "frag", "fragment"}, "f"}
+const std::vector<Alias_bgfx<std::string> > n_type_aliases = {
+    {{"v", "vert", "vertex"}, "vertex"},
+    {{"f", "frag", "fragment"}, "fragment"},
+    {{"c", "comp", "compute"}, "compute"}
 };
 
+struct Pflags {
+    std::string m_vert;
+    std::string m_frag;
+    std::string m_comp;
     
-const std::vector<Alias_bgfx> n_platform_aliases = {
-    {{"android"}, "android"},
-    {{"asm.js"}, "asm.js"},
-    {{"ios"}, "ios"},
-    {{"linux"}, "linux"},
-    {{"nacl"}, "nacl"},
-    {{"osx"}, "osx"},
-    {{"windows"}, "windows"}
+    const std::string& get_params(const std::string& type) const {
+        if (type == "vertex") {
+            return m_vert;
+        } else if (type == "fragment") {
+            return m_frag;
+        } else if (type == "compute") {
+            return m_comp;
+        }
+        assert(false && "Invalid type passed to Pflags");
+    }
+};
+
+const std::string SHADER_INVALID = "__UNSUPPORTED__";
+
+const std::vector<Alias_bgfx<Pflags> > n_platform_aliases = {
+    {{"dx9"}, {
+        "windows -p vs_3_0",
+        "windows -p ps_3_0",
+        SHADER_INVALID
+    }},
+    {{"dx11"}, {
+        "windows -p vs_4_0",
+        "windows -p ps_4_0",
+        "windows -p cs_5_0"
+    }},
+    {{"pssl"}, {
+        "orbis -p pssl",
+        "orbis -p pssl",
+        "orbis -p pssl"
+    }},
+    {{"metal"}, {
+        "osx -p metal",
+        "osx -p metal",
+        "osx -p metal"
+    }},
+    {{"glsl"}, {
+        "linux -p 120",
+        "linux -p 120",
+        "linux -p 430"
+    }},
+    {{"essl"}, {
+        "android",
+        "android",
+        "android"
+    }},
+    {{"spirv"}, {
+        "linux -p spirv",
+        "linux -p spirv",
+        "linux -p spirv"
+    }}
 };
     
 const boost::filesystem::path n_std_shader_dir = "./bgfx/";
 
-std::string resolve(std::string input, 
-        const std::vector<Alias_bgfx>& mapping, const char* dbg_name) {
-    for (const Alias_bgfx& alias : mapping) {
+template<typename T>
+const T& resolve(std::string input, 
+        const std::vector<Alias_bgfx<T> >& mapping, const char* dbg_name) {
+    for (const Alias_bgfx<T>& alias : mapping) {
         auto& from = alias.m_from;
         if (std::find(from.begin(), from.end(), input) != from.end()) {
             return alias.m_to;
@@ -61,10 +111,19 @@ void convert_bgfx_shader(const Convert_Args& args) {
     Logger::log()->info(json_type.asString());
     */
     
-    std::string sc_platform = 
-            resolve(json_platform.asString(), n_platform_aliases, "platform");
-    std::string sc_type = 
+    const std::string& sc_type = 
             resolve(json_type.asString(), n_type_aliases, "shader type");
+    const std::string& sc_platform = 
+            resolve(json_platform.asString(), n_platform_aliases, "platform")
+                    .get_params(sc_type);
+    
+    if (sc_platform == SHADER_INVALID) {
+        std::stringstream sss;
+        sss << "There is no shader matching: type="
+            << sc_type << ", platform="
+            << json_platform.asString();
+        throw std::runtime_error(sss.str());
+    }
     
     std::stringstream cmd;
     cmd << "shaderc"
