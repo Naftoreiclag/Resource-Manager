@@ -6,14 +6,15 @@
 
 namespace resman {
     
-const std::array<const char*, 7> n_all_shader_platforms = {
+const std::array<const char*, 8> n_all_shader_platforms = {
     "dx9",
     "dx11",
     "pssl",
     "metal",
     "glsl",
     "essl",
-    "spirv"
+    "spirv",
+    "src"
 };
 
 std::vector<Expansion> expand_bgfx_shader(const Object& obj) {

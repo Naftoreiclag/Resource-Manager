@@ -103,6 +103,11 @@ void convert_bgfx_shader(const Convert_Args& args) {
     Json::Value json_platform = args.params["platform"];
     Json::Value json_type = args.params["type"];
     
+    if (json_platform.asString() == "src") {
+        boost::filesystem::copy(args.fromFile, args.outputFile);
+        return;
+    }
+    
     /*
     Logger::log()->info("bgfx shader");
     Logger::log()->info(args.fromFile);
@@ -139,7 +144,8 @@ void convert_bgfx_shader(const Convert_Args& args) {
         << sc_type;
     std::system(cmd.str().c_str());
     
-    if (!boost::filesystem::exists(args.outputFile)) {
+    if (!boost::filesystem::exists(args.outputFile)
+            || boost::filesystem::file_size(args.outputFile) == 0) {
         std::stringstream sss;
         sss << "shaderc failed to output file "
             << args.outputFile;
