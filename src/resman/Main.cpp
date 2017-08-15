@@ -259,6 +259,14 @@ private:
             object.m_force_retrans = true;
         }
         
+        if (!boost::filesystem::exists(object.m_src_file)) {
+            std::stringstream sss;
+            sss << "Source file: "
+                << object.m_src_file
+                << " does not exist!";
+            throw std::runtime_error(sss.str());
+        }
+        
         m_objects.push_back(object);
         
         Logger::log()->verbose(2, "Resource: name = %v", object.m_name);
@@ -481,7 +489,15 @@ private:
     void hash_file(const boost::filesystem::path& file, uint32_t& src_hash) {
         std::ifstream sizeTest(file.string().c_str(), 
                 std::ios::binary | std::ios::ate);
-        int src_size = sizeTest.tellg();
+                
+        if (sizeTest.fail()) {
+            std::stringstream sss;
+            sss << "Cannot open file for hashing: "
+                << file;
+            throw std::runtime_error(sss.str());
+        }
+                
+        std::ios::pos_type src_size = sizeTest.tellg();
 
         char* totalData = new char[src_size];
         sizeTest.seekg(0, std::ios::beg);
@@ -542,8 +558,12 @@ private:
         Json::Value& json_next_idx = m_json_interm["next-idx"];
         uint64_t next_idx = json_next_idx.asUInt64();
         for (Object& object : m_objects) {
-            hash_file(object.m_src_file, object.m_src_hash);
-            hash_json(object.m_params, object.m_params_hash);
+            try {
+                hash_file(object.m_src_file, object.m_src_hash);
+                hash_json(object.m_params, object.m_params_hash);
+            } catch (std::runtime_error& e) {
+                Logger::log()->warn("Failed to calculate hashes: %v", e.what());
+            }
             
             /*
              * If a pre-compiled file exists with exactly the same:
